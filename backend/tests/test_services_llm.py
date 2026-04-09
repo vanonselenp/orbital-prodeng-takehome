@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from takehome.services.llm import count_sources_cited, generate_title
+from takehome.services.llm import chat_with_document, count_sources_cited, generate_title
 
 
 def test_count_sources_cited_no_matches():
@@ -49,3 +50,77 @@ async def test_generate_title_truncation(mock_agent):
     title = await generate_title("some message")
     assert len(title) == 100
     assert title.endswith("...")
+
+
+# --------------------------------------------------------------------------- #
+# chat_with_document — async streaming
+# --------------------------------------------------------------------------- #
+
+
+def _make_streaming_agent(chunks: list[str]) -> MagicMock:
+    """Build a mock agent whose run_stream yields the given chunks."""
+
+    async def fake_stream_text(delta: bool = True):
+        for c in chunks:
+            yield c
+
+    fake_result = MagicMock()
+    fake_result.stream_text = fake_stream_text
+
+    @asynccontextmanager
+    async def fake_run_stream(prompt: str):
+        yield fake_result
+
+    mock = MagicMock()
+    mock.run_stream = fake_run_stream
+    return mock
+
+
+@patch("takehome.services.llm.agent")
+async def test_chat_with_document_with_document_text(mock_agent):
+    mock_agent.run_stream = _make_streaming_agent(["Hello ", "world"]).run_stream
+
+    chunks = []
+    async for chunk in chat_with_document(
+        user_message="What is this?",
+        document_text="This is a lease document.",
+        conversation_history=[],
+    ):
+        chunks.append(chunk)
+
+    assert chunks == ["Hello ", "world"]
+
+
+@patch("takehome.services.llm.agent")
+async def test_chat_with_document_no_document(mock_agent):
+    mock_agent.run_stream = _make_streaming_agent(["ok"]).run_stream
+
+    chunks = []
+    async for chunk in chat_with_document(
+        user_message="hi",
+        document_text=None,
+        conversation_history=[],
+    ):
+        chunks.append(chunk)
+
+    assert chunks == ["ok"]
+
+
+@patch("takehome.services.llm.agent")
+async def test_chat_with_document_with_history(mock_agent):
+    mock_agent.run_stream = _make_streaming_agent(["response"]).run_stream
+
+    history = [
+        {"role": "user", "content": "earlier question"},
+        {"role": "assistant", "content": "earlier answer"},
+        {"role": "system", "content": "ignored role"},
+    ]
+    chunks = []
+    async for chunk in chat_with_document(
+        user_message="follow up",
+        document_text="doc",
+        conversation_history=history,
+    ):
+        chunks.append(chunk)
+
+    assert chunks == ["response"]

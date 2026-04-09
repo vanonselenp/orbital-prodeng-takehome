@@ -17,6 +17,8 @@ build/
 # Coverage
 .coverage
 .coverage.*
+coverage.json
+coverage.xml
 htmlcov/
 coverage/
 *.lcov

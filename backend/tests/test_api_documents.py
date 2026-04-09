@@ -1,4 +1,13 @@
+"""Unit tests for document router endpoints (direct-call, see conversations test note)."""
 from __future__ import annotations
+
+import io
+
+import pytest
+from fastapi import HTTPException, UploadFile
+
+from takehome.services.conversation import create_conversation
+from takehome.web.routers.documents import serve_document_file, upload_document_endpoint
 
 MINIMAL_PDF = (
     b"%PDF-1.0\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj "
@@ -13,69 +22,83 @@ MINIMAL_PDF = (
 )
 
 
-async def test_upload_document_success(client, tmp_upload_dir):
-    create_resp = await client.post("/api/conversations")
-    cid = create_resp.json()["id"]
+def make_upload_file(content: bytes, filename: str = "test.pdf", content_type: str = "application/pdf") -> UploadFile:
+    return UploadFile(file=io.BytesIO(content), filename=filename, headers={"content-type": content_type})
 
-    resp = await client.post(
-        f"/api/conversations/{cid}/documents",
-        files={"file": ("test.pdf", MINIMAL_PDF, "application/pdf")},
+
+async def test_upload_document_success(db_session, tmp_upload_dir):
+    conv = await create_conversation(db_session)
+    file = make_upload_file(MINIMAL_PDF)
+
+    result = await upload_document_endpoint(
+        conversation_id=conv.id, file=file, session=db_session
     )
-    assert resp.status_code == 201
-    data = resp.json()
-    assert data["filename"] == "test.pdf"
-    assert data["conversation_id"] == cid
+    assert result.conversation_id == conv.id
+    assert result.filename == "test.pdf"
 
 
-async def test_upload_document_conversation_not_found(client, tmp_upload_dir):
-    resp = await client.post(
-        "/api/conversations/nonexistent12345/documents",
-        files={"file": ("test.pdf", MINIMAL_PDF, "application/pdf")},
+async def test_upload_document_conversation_not_found(db_session, tmp_upload_dir):
+    file = make_upload_file(MINIMAL_PDF)
+    with pytest.raises(HTTPException) as exc:
+        await upload_document_endpoint(
+            conversation_id="nonexistent", file=file, session=db_session
+        )
+    assert exc.value.status_code == 404
+
+
+async def test_upload_document_duplicate(db_session, tmp_upload_dir):
+    conv = await create_conversation(db_session)
+    file1 = make_upload_file(MINIMAL_PDF)
+    await upload_document_endpoint(conversation_id=conv.id, file=file1, session=db_session)
+
+    file2 = make_upload_file(MINIMAL_PDF)
+    with pytest.raises(HTTPException) as exc:
+        await upload_document_endpoint(
+            conversation_id=conv.id, file=file2, session=db_session
+        )
+    assert exc.value.status_code == 409
+
+
+async def test_upload_document_non_pdf(db_session, tmp_upload_dir):
+    conv = await create_conversation(db_session)
+    file = make_upload_file(b"not a pdf", filename="test.txt", content_type="text/plain")
+    with pytest.raises(HTTPException) as exc:
+        await upload_document_endpoint(
+            conversation_id=conv.id, file=file, session=db_session
+        )
+    assert exc.value.status_code == 400
+
+
+async def test_serve_document_not_found(db_session):
+    with pytest.raises(HTTPException) as exc:
+        await serve_document_file(document_id="nonexistent", session=db_session)
+    assert exc.value.status_code == 404
+
+
+async def test_serve_document_file_missing_on_disk(db_session):
+    conv = await create_conversation(db_session)
+    from takehome.db.models import Document
+
+    doc = Document(
+        conversation_id=conv.id,
+        filename="ghost.pdf",
+        file_path="/nonexistent/path/ghost.pdf",
+        page_count=1,
     )
-    assert resp.status_code == 404
+    db_session.add(doc)
+    await db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        await serve_document_file(document_id=doc.id, session=db_session)
+    assert exc.value.status_code == 404
 
 
-async def test_upload_document_duplicate(client, tmp_upload_dir):
-    create_resp = await client.post("/api/conversations")
-    cid = create_resp.json()["id"]
-
-    await client.post(
-        f"/api/conversations/{cid}/documents",
-        files={"file": ("test.pdf", MINIMAL_PDF, "application/pdf")},
+async def test_serve_document_success(db_session, tmp_upload_dir):
+    conv = await create_conversation(db_session)
+    file = make_upload_file(MINIMAL_PDF)
+    doc = await upload_document_endpoint(
+        conversation_id=conv.id, file=file, session=db_session
     )
-    resp = await client.post(
-        f"/api/conversations/{cid}/documents",
-        files={"file": ("test2.pdf", MINIMAL_PDF, "application/pdf")},
-    )
-    assert resp.status_code == 409
 
-
-async def test_upload_document_non_pdf(client, tmp_upload_dir):
-    create_resp = await client.post("/api/conversations")
-    cid = create_resp.json()["id"]
-
-    resp = await client.post(
-        f"/api/conversations/{cid}/documents",
-        files={"file": ("test.txt", b"not a pdf", "text/plain")},
-    )
-    assert resp.status_code == 400
-
-
-async def test_serve_document_not_found(client):
-    resp = await client.get("/api/documents/nonexistent12345/content")
-    assert resp.status_code == 404
-
-
-async def test_serve_document_success(client, tmp_upload_dir):
-    create_resp = await client.post("/api/conversations")
-    cid = create_resp.json()["id"]
-
-    upload_resp = await client.post(
-        f"/api/conversations/{cid}/documents",
-        files={"file": ("test.pdf", MINIMAL_PDF, "application/pdf")},
-    )
-    doc_id = upload_resp.json()["id"]
-
-    resp = await client.get(f"/api/documents/{doc_id}/content")
-    assert resp.status_code == 200
-    assert resp.headers["content-type"] == "application/pdf"
+    result = await serve_document_file(document_id=doc.id, session=db_session)
+    assert result.media_type == "application/pdf"

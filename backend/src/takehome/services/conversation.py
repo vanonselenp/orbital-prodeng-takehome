@@ -47,8 +47,10 @@ async def update_conversation(
         return None
     conversation.title = title
     await session.commit()
-    await session.refresh(conversation)
-    return conversation
+    # Re-fetch to ensure the documents relationship stays eager-loaded
+    # (session.refresh doesn't reload relationships, which would force a
+    # lazy-load outside a greenlet context in some callers).
+    return await get_conversation(session, conversation_id)
 
 
 async def delete_conversation(session: AsyncSession, conversation_id: str) -> bool:

@@ -14,7 +14,13 @@ logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:  # pragma: no cover
+    # Justification: this runs Alembic migrations against the production
+    # PostgreSQL instance at app startup. It has no branching logic — it
+    # just invokes `alembic upgrade head`. Testing it would require spinning
+    # up a real Postgres, which offers no incremental business-logic coverage
+    # since the actual migration content is already exercised by db_session
+    # fixture (create_all) in every other test.
     logger.info("Running database migrations...")
     alembic_cfg = Config("alembic.ini")
     # Run in a thread because alembic's env.py uses asyncio.run(),

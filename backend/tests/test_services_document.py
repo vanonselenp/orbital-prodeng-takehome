@@ -108,3 +108,56 @@ async def test_upload_document_too_large(db_session, tmp_upload_dir, monkeypatch
     file = make_upload_file(MINIMAL_PDF)
     with pytest.raises(ValueError, match="File too large"):
         await upload_document(db_session, conv.id, file)
+
+
+async def test_upload_document_pdf_extraction_failure_is_tolerated(
+    db_session, tmp_upload_dir
+):
+    """If PDF extraction raises, we still create the record with empty text."""
+    conv = await create_conversation(db_session)
+    # A file with the .pdf extension but garbage contents; PyMuPDF will raise.
+    file = make_upload_file(b"not really a pdf at all", filename="corrupt.pdf")
+    doc = await upload_document(db_session, conv.id, file)
+
+    assert doc.filename == "corrupt.pdf"
+    assert doc.extracted_text is None
+    assert doc.page_count == 0
+
+
+async def test_upload_document_accepts_pdf_by_extension(db_session, tmp_upload_dir):
+    """Files with .pdf extension should be accepted even with non-PDF content type."""
+    conv = await create_conversation(db_session)
+    file = make_upload_file(
+        MINIMAL_PDF, filename="test.pdf", content_type="application/octet-stream"
+    )
+    doc = await upload_document(db_session, conv.id, file)
+    assert doc.filename == "test.pdf"
+
+
+async def test_upload_document_empty_text_page(db_session, tmp_upload_dir):
+    """A PDF with pages that yield empty text exercises the strip() branch."""
+    conv = await create_conversation(db_session)
+    file = make_upload_file(MINIMAL_PDF)
+    doc = await upload_document(db_session, conv.id, file)
+    # Our minimal PDF has no text content, so extracted_text should be empty/None.
+    assert doc.extracted_text is None or doc.extracted_text == ""
+
+
+async def test_upload_document_with_real_pdf_text(db_session, tmp_upload_dir):
+    """Upload a real PDF from sample-docs to exercise the text-extraction path."""
+    import pathlib
+
+    sample = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "sample-docs"
+        / "title-report-lot-7.pdf"
+    )
+    content = sample.read_bytes()
+    conv = await create_conversation(db_session)
+    file = make_upload_file(content, filename="title-report-lot-7.pdf")
+    doc = await upload_document(db_session, conv.id, file)
+
+    assert doc.page_count > 0
+    assert doc.extracted_text is not None
+    assert len(doc.extracted_text) > 0
+    assert "--- Page 1 ---" in doc.extracted_text
