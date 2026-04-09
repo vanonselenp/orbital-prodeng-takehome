@@ -14,6 +14,14 @@ build/
 .pyright/
 .ruff_cache/
 
+# Coverage
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+*.lcov
+.nyc_output/
+
 # Node
 node_modules/
 

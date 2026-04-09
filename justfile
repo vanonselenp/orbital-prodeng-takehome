@@ -68,6 +68,32 @@ db-shell:
     docker compose exec db psql -U orbital orbital_takehome
 
 # =============================================================================
+# Testing
+# =============================================================================
+
+# Run all tests
+test: test-backend test-frontend
+
+# Run backend tests
+test-backend:
+    uv run pytest backend/tests -v
+
+# Run frontend tests
+test-frontend:
+    cd frontend && npx vitest run
+
+# Run all tests with coverage reports
+coverage: coverage-backend coverage-frontend
+
+# Backend coverage (terminal + HTML in htmlcov/)
+coverage-backend:
+    uv run pytest backend/tests --cov=takehome --cov-report=term-missing --cov-report=html
+
+# Frontend coverage (terminal + HTML in frontend/coverage/)
+coverage-frontend:
+    cd frontend && npx vitest run --coverage
+
+# =============================================================================
 # Code Quality
 # =============================================================================
 
