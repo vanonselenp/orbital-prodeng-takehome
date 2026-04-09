@@ -25,9 +25,11 @@ export function ChatInput({
 		if (!trimmed || disabled) return;
 		onSend(trimmed);
 		setValue("");
+		/* v8 ignore start -- Ref is always populated when the component is mounted; the else branch is unreachable in practice. */
 		if (textareaRef.current) {
 			textareaRef.current.style.height = "auto";
 		}
+		/* v8 ignore stop */
 	}, [value, disabled, onSend]);
 
 	const handleKeyDown = useCallback(
@@ -42,7 +44,9 @@ export function ChatInput({
 
 	const handleInput = useCallback(() => {
 		const textarea = textareaRef.current;
+		/* v8 ignore start -- Ref is always populated when the component is mounted; the early return is unreachable in practice. */
 		if (!textarea) return;
+		/* v8 ignore stop */
 		textarea.style.height = "auto";
 		textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
 	}, []);
@@ -54,9 +58,11 @@ export function ChatInput({
 				onUpload(file);
 			}
 			// Reset the input so the same file can be selected again
+			/* v8 ignore start -- Ref is always populated when the component is mounted; the else branch is unreachable in practice. */
 			if (fileInputRef.current) {
 				fileInputRef.current.value = "";
 			}
+			/* v8 ignore stop */
 		},
 		[onUpload],
 	);

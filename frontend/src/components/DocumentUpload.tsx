@@ -45,9 +45,11 @@ export function DocumentUpload({
 			if (file) {
 				onUpload(file);
 			}
+			/* v8 ignore start -- Ref is always populated when the component is mounted; the else branch is unreachable in practice. */
 			if (fileInputRef.current) {
 				fileInputRef.current.value = "";
 			}
+			/* v8 ignore stop */
 		},
 		[onUpload],
 	);

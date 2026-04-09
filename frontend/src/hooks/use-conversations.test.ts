@@ -85,6 +85,77 @@ describe("useConversations", () => {
 		expect(result.current.selectedId).toBeNull();
 	});
 
+	it("sets error on create failure", async () => {
+		mockCreate.mockRejectedValue(new Error("Create failed"));
+		const { result } = renderHook(() => useConversations());
+		await waitFor(() => expect(result.current.loading).toBe(false));
+
+		let created: unknown;
+		await act(async () => {
+			created = await result.current.create();
+		});
+
+		expect(created).toBeNull();
+		expect(result.current.error).toBe("Create failed");
+	});
+
+	it("sets generic error on create failure with non-Error", async () => {
+		mockCreate.mockRejectedValue("something");
+		const { result } = renderHook(() => useConversations());
+		await waitFor(() => expect(result.current.loading).toBe(false));
+
+		await act(async () => {
+			await result.current.create();
+		});
+
+		expect(result.current.error).toBe("Failed to create conversation");
+	});
+
+	it("sets error on delete failure", async () => {
+		mockDelete.mockRejectedValue(new Error("Delete failed"));
+		const { result } = renderHook(() => useConversations());
+		await waitFor(() => expect(result.current.loading).toBe(false));
+
+		await act(async () => {
+			await result.current.remove("1");
+		});
+
+		expect(result.current.error).toBe("Delete failed");
+	});
+
+	it("sets generic error on delete failure with non-Error", async () => {
+		mockDelete.mockRejectedValue("something");
+		const { result } = renderHook(() => useConversations());
+		await waitFor(() => expect(result.current.loading).toBe(false));
+
+		await act(async () => {
+			await result.current.remove("1");
+		});
+
+		expect(result.current.error).toBe("Failed to delete conversation");
+	});
+
+	it("sets generic error on fetch failure with non-Error", async () => {
+		mockFetch.mockRejectedValue("non-error");
+		const { result } = renderHook(() => useConversations());
+		await waitFor(() => expect(result.current.loading).toBe(false));
+		expect(result.current.error).toBe("Failed to load conversations");
+	});
+
+	it("does not clear selectedId when removing a different conversation", async () => {
+		mockDelete.mockResolvedValue(undefined);
+		const { result } = renderHook(() => useConversations());
+		await waitFor(() => expect(result.current.loading).toBe(false));
+
+		act(() => result.current.select("1"));
+		await act(async () => {
+			await result.current.remove("2");
+		});
+
+		expect(result.current.selectedId).toBe("1");
+		expect(result.current.conversations).toHaveLength(1);
+	});
+
 	it("refreshes conversations", async () => {
 		const { result } = renderHook(() => useConversations());
 		await waitFor(() => expect(result.current.loading).toBe(false));
