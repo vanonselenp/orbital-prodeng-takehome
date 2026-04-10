@@ -306,9 +306,13 @@ export function DocumentViewer({
 			{/* Delete confirmation dialog */}
 			<Dialog
 				open={deleteTarget !== null}
-				onOpenChange={/* v8 ignore next — Radix internal callback triggered by overlay/escape, not reachable via testing-library */ (open) => {
-					if (!open) setDeleteTarget(null);
-				}}
+				onOpenChange={
+					/* v8 ignore next — Radix internal callback triggered by overlay/escape, not reachable via testing-library */ (
+						open,
+					) => {
+						if (!open) setDeleteTarget(null);
+					}
+				}
 			>
 				<DialogContent>
 					<DialogHeader>

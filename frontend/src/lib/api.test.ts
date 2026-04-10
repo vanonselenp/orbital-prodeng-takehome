@@ -37,9 +37,7 @@ describe("fetchConversations", () => {
 	});
 
 	it("throws on error response", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Not Found", { status: 404 }),
-		);
+		mockFetch.mockResolvedValue(new Response("Not Found", { status: 404 }));
 		await expect(fetchConversations()).rejects.toThrow("API error 404");
 	});
 });
@@ -68,12 +66,8 @@ describe("deleteConversation", () => {
 	});
 
 	it("throws on error", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Not found", { status: 404 }),
-		);
-		await expect(deleteConversation("bad")).rejects.toThrow(
-			"API error 404",
-		);
+		mockFetch.mockResolvedValue(new Response("Not found", { status: 404 }));
+		await expect(deleteConversation("bad")).rejects.toThrow("API error 404");
 	});
 });
 
@@ -137,12 +131,8 @@ describe("sendMessage", () => {
 	});
 
 	it("throws on error", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Server error", { status: 500 }),
-		);
-		await expect(sendMessage("conv-1", "hi")).rejects.toThrow(
-			"API error 500",
-		);
+		mockFetch.mockResolvedValue(new Response("Server error", { status: 500 }));
+		await expect(sendMessage("conv-1", "hi")).rejects.toThrow("API error 500");
 	});
 });
 
@@ -184,9 +174,7 @@ describe("deleteDocument", () => {
 	});
 
 	it("throws on non-OK response", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Not found", { status: 404 }),
-		);
+		mockFetch.mockResolvedValue(new Response("Not found", { status: 404 }));
 		await expect(deleteDocument("conv-1", "bad-id")).rejects.toThrow(
 			"API error 404",
 		);

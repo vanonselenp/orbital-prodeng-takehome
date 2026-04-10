@@ -83,7 +83,7 @@ function renderChatWindow(
 		onUpload: vi.fn(),
 		canUpload: true,
 		onCitationClick: vi.fn(),
-		};
+	};
 	return render(
 		<TooltipProvider>
 			<ChatWindow {...defaultProps} {...props} />
@@ -178,7 +178,9 @@ describe("ChatWindow", () => {
 
 	it("renders citation chips for assistant messages", () => {
 		renderChatWindow({ messages });
-		expect(screen.getByRole("button", { name: "lease.pdf p.2" })).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "lease.pdf p.2" }),
+		).toBeInTheDocument();
 	});
 
 	it("renders system messages", () => {

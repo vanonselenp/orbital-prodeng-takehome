@@ -43,8 +43,6 @@ describe("relativeTime", () => {
 	it("returns locale date string for older dates", () => {
 		const date = new Date();
 		date.setDate(date.getDate() - 10);
-		expect(relativeTime(date.toISOString())).toBe(
-			date.toLocaleDateString(),
-		);
+		expect(relativeTime(date.toISOString())).toBe(date.toLocaleDateString());
 	});
 });

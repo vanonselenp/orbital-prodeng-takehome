@@ -202,9 +202,7 @@ describe("useMessages", () => {
 			body: stream,
 		} as unknown as Response);
 
-		mockFetchMessages
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([msg1]);
+		mockFetchMessages.mockResolvedValueOnce([]).mockResolvedValueOnce([msg1]);
 
 		const { result } = renderHook(() => useMessages("conv-1"));
 		await waitFor(() => expect(result.current.loading).toBe(false));
@@ -282,9 +280,7 @@ describe("useMessages", () => {
 			body: stream,
 		} as unknown as Response);
 
-		mockFetchMessages
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([msg1]);
+		mockFetchMessages.mockResolvedValueOnce([]).mockResolvedValueOnce([msg1]);
 
 		const { result } = renderHook(() => useMessages("conv-1"));
 		await waitFor(() => expect(result.current.loading).toBe(false));
@@ -316,9 +312,7 @@ describe("useMessages", () => {
 			body: stream,
 		} as unknown as Response);
 
-		mockFetchMessages
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([msg1]);
+		mockFetchMessages.mockResolvedValueOnce([]).mockResolvedValueOnce([msg1]);
 
 		const { result } = renderHook(() => useMessages("conv-1"));
 		await waitFor(() => expect(result.current.loading).toBe(false));
@@ -352,9 +346,7 @@ describe("useMessages", () => {
 			body: stream,
 		} as unknown as Response);
 
-		mockFetchMessages
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([msg1]);
+		mockFetchMessages.mockResolvedValueOnce([]).mockResolvedValueOnce([msg1]);
 
 		const { result } = renderHook(() => useMessages("conv-1"));
 		await waitFor(() => expect(result.current.loading).toBe(false));
@@ -474,9 +466,7 @@ describe("useMessages", () => {
 			body: stream,
 		} as unknown as Response);
 
-		mockFetchMessages
-			.mockResolvedValueOnce([])
-			.mockResolvedValueOnce([]);
+		mockFetchMessages.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
 
 		const { result } = renderHook(() => useMessages("conv-1"));
 		await waitFor(() => expect(result.current.loading).toBe(false));

@@ -33,9 +33,7 @@ export function useDocuments(conversationId: string | null) {
 				return detail.documents[0]?.id ?? null;
 			});
 		} catch (err) {
-			setError(
-				err instanceof Error ? err.message : "Failed to load documents",
-			);
+			setError(err instanceof Error ? err.message : "Failed to load documents");
 		}
 	}, [conversationId]);
 

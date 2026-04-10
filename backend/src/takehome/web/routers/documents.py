@@ -64,11 +64,11 @@ async def upload_document_endpoint(
 
     try:
         document = await upload_document(session, conversation_id, file)
-    except ValueError as e:
-        error_message = str(e)
+    except ValueError as err:
+        error_message = str(err)
         if "Maximum number of documents" in error_message:
-            raise HTTPException(status_code=409, detail=error_message)
-        raise HTTPException(status_code=400, detail=error_message)
+            raise HTTPException(status_code=409, detail=error_message) from err
+        raise HTTPException(status_code=400, detail=error_message) from err
 
     logger.info(
         "Document uploaded",

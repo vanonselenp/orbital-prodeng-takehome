@@ -250,7 +250,8 @@ describe("App", () => {
 				uploaded_at: "2024-01-01",
 			},
 		];
-		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
 
 		render(<App />);
 
@@ -305,7 +306,8 @@ describe("App", () => {
 				uploaded_at: "2024-01-01",
 			},
 		];
-		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
 		mockMessagesState.messages = [
 			{
 				id: "m1",
@@ -342,7 +344,8 @@ describe("App", () => {
 				uploaded_at: "2024-01-01",
 			},
 		];
-		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
 		mockDocumentsState.error =
 			"A document named 'lease.pdf' already exists in this conversation.";
 
@@ -366,7 +369,8 @@ describe("App", () => {
 				uploaded_at: "2024-01-01",
 			},
 		];
-		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
 		mockMessagesState.messages = [
 			{
 				id: "m1",
@@ -431,7 +435,8 @@ describe("App", () => {
 				uploaded_at: "2024-01-02",
 			},
 		];
-		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
 
 		render(<App />);
 
@@ -456,7 +461,8 @@ describe("App", () => {
 				uploaded_at: "2024-01-01",
 			},
 		];
-		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
 		mockMessagesState.messages = [
 			{
 				id: "m1",

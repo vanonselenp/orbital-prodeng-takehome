@@ -9,8 +9,14 @@ export function stripPartialCitationBlock(content: string): string {
 		return withoutCompleteBlock.slice(0, tagStart);
 	}
 
-	for (let prefixLength = CITATION_OPEN_TAG.length - 1; prefixLength > 0; prefixLength -= 1) {
-		if (withoutCompleteBlock.endsWith(CITATION_OPEN_TAG.slice(0, prefixLength))) {
+	for (
+		let prefixLength = CITATION_OPEN_TAG.length - 1;
+		prefixLength > 0;
+		prefixLength -= 1
+	) {
+		if (
+			withoutCompleteBlock.endsWith(CITATION_OPEN_TAG.slice(0, prefixLength))
+		) {
 			return withoutCompleteBlock.slice(0, -prefixLength);
 		}
 	}

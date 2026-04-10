@@ -29,10 +29,7 @@ vi.mock("react-pdf", () => ({
 			</div>
 		);
 	},
-	Page: ({
-		pageNumber,
-		width,
-	}: { pageNumber: number; width: number }) => (
+	Page: ({ pageNumber, width }: { pageNumber: number; width: number }) => (
 		<div data-testid="pdf-page" data-page={pageNumber} data-width={width}>
 			Page {pageNumber}
 		</div>

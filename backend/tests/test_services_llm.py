@@ -4,15 +4,15 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from takehome.services.llm import (
+    MAX_DOCUMENT_TEXT_LENGTH,
     REFUSAL_MESSAGE,
     CitationContext,
-    MAX_DOCUMENT_TEXT_LENGTH,
-    strip_partial_citation_block,
     _truncate_documents,
     build_grounded_response,
     chat_with_documents,
     generate_title,
     parse_citation_candidates,
+    strip_partial_citation_block,
 )
 
 

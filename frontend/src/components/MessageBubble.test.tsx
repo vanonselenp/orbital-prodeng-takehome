@@ -5,10 +5,7 @@ import { MessageBubble, StreamingBubble } from "./MessageBubble";
 
 // Mock Streamdown which requires browser APIs not available in jsdom
 vi.mock("streamdown", () => ({
-	Streamdown: ({
-		children,
-		mode,
-	}: { children: string; mode?: string }) => (
+	Streamdown: ({ children, mode }: { children: string; mode?: string }) => (
 		<span data-mode={mode}>{children}</span>
 	),
 }));
@@ -93,8 +90,12 @@ describe("MessageBubble", () => {
 			created_at: "2024-01-01T00:00:00Z",
 		};
 		render(<MessageBubble message={message} />);
-		expect(screen.getByRole("button", { name: "lease.pdf p.3" })).toBeInTheDocument();
-		expect(screen.getByRole("button", { name: "addendum.pdf p.7" })).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "lease.pdf p.3" }),
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "addendum.pdf p.7" }),
+		).toBeInTheDocument();
 	});
 
 	it("clicking a citation chip calls onCitationClick", async () => {

@@ -106,7 +106,7 @@ export function useMessages(conversationId: string | null) {
 								// Final message from server
 								setMessages((prev) => [...prev, parsed.message as Message]);
 								accumulated = "";
-							/* v8 ignore start -- Fallback branch for plain {content} payloads without a type field; already tested but v8 marks the else-if condition as a partial branch miss */
+								/* v8 ignore start -- Fallback branch for plain {content} payloads without a type field; already tested but v8 marks the else-if condition as a partial branch miss */
 							} else if (parsed.content && !parsed.type) {
 								// Fallback: plain content field
 								accumulated += parsed.content;
