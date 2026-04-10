@@ -1,6 +1,6 @@
 """Enforce unique document filenames per conversation.
 
-Revision ID: 003_add_unique_document_filenames
+Revision ID: 003_unique_document_filenames
 Revises: 002_add_citations_and_grounding
 Create Date: 2026-04-10 23:10:00.000000
 """
@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = "003_add_unique_document_filenames"
+revision: str = "003_unique_document_filenames"
 down_revision: str | None = "002_add_citations_and_grounding"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None

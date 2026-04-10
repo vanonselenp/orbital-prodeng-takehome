@@ -45,3 +45,9 @@ def test_make_unique_filename_handles_files_without_extension():
     result = migration.make_unique_filename("lease", {"lease"})
 
     assert result == "lease (1)"
+
+
+def test_revision_identifier_fits_alembic_version_column_limit():
+    migration = load_migration_module()
+
+    assert len(migration.revision) <= 32
