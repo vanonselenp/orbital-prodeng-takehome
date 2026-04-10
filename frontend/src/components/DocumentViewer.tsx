@@ -33,11 +33,13 @@ const DEFAULT_WIDTH = 400;
 interface DocumentViewerProps {
 	documents: Document[];
 	selectedDocument: Document | null;
+	error?: string | null;
 	onSelectDocument: (id: string) => void;
 	onDeleteDocument: (id: string) => void;
 	onUpload: (file: File) => void;
 	canUpload: boolean;
 	targetPage?: number | null;
+	targetPageRequestId?: number | null;
 }
 
 function truncateFilename(name: string, maxLen = 15): string {
@@ -48,11 +50,13 @@ function truncateFilename(name: string, maxLen = 15): string {
 export function DocumentViewer({
 	documents,
 	selectedDocument,
+	error = null,
 	onSelectDocument,
 	onDeleteDocument,
 	onUpload,
 	canUpload,
 	targetPage = null,
+	targetPageRequestId = null,
 }: DocumentViewerProps) {
 	const [numPages, setNumPages] = useState<number>(0);
 	const [currentPage, setCurrentPage] = useState(1);
@@ -82,9 +86,10 @@ export function DocumentViewer({
 			return;
 		}
 
+		void targetPageRequestId;
 		const maxPage = numPages > 0 ? numPages : selectedDocument.page_count;
 		setCurrentPage(Math.min(maxPage, Math.max(1, targetPage)));
-	}, [numPages, selectedDocument, targetPage]);
+	}, [numPages, selectedDocument, targetPage, targetPageRequestId]);
 
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
@@ -151,6 +156,12 @@ export function DocumentViewer({
 			style={{ width }}
 			className="relative flex h-full flex-shrink-0 flex-col border-l border-neutral-200 bg-white"
 		>
+			{error && (
+				<div className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+					{error}
+				</div>
+			)}
+
 			{/* Resize handle */}
 			<div
 				className={`absolute top-0 left-0 z-10 h-full w-1.5 cursor-col-resize transition-colors hover:bg-neutral-300 ${

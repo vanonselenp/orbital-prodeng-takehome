@@ -9,7 +9,10 @@ import { useMessages } from "./hooks/use-messages";
 import type { Citation } from "./types";
 
 export default function App() {
-	const [targetCitation, setTargetCitation] = useState<Citation | null>(null);
+	const [targetCitation, setTargetCitation] = useState<{
+		citation: Citation;
+		requestId: number;
+	} | null>(null);
 
 	const {
 		conversations,
@@ -34,6 +37,7 @@ export default function App() {
 		documents,
 		selectedDocument,
 		canUpload,
+		error: documentError,
 		upload,
 		remove: removeDocument,
 		selectDocument,
@@ -62,7 +66,7 @@ export default function App() {
 	const handleDeleteDocument = useCallback(
 		async (id: string) => {
 			setTargetCitation((current) =>
-				current?.document_id === id ? null : current,
+				current?.citation.document_id === id ? null : current,
 			);
 			await removeDocument(id);
 			refreshConversations();
@@ -81,7 +85,10 @@ export default function App() {
 	const handleCitationClick = useCallback(
 		(citation: Citation) => {
 			selectDocument(citation.document_id);
-			setTargetCitation(citation);
+			setTargetCitation((current) => ({
+				citation,
+				requestId: (current?.requestId ?? 0) + 1,
+			}));
 		},
 		[selectDocument],
 	);
@@ -119,15 +126,17 @@ export default function App() {
 				<DocumentViewer
 					documents={documents}
 					selectedDocument={selectedDocument}
+					error={documentError}
 					onSelectDocument={handleSelectDocument}
 					onDeleteDocument={handleDeleteDocument}
 					onUpload={handleUpload}
 					canUpload={canUpload}
 					targetPage={
-						targetCitation?.document_id === selectedDocument?.id
-							? (targetCitation?.page ?? null)
+						targetCitation?.citation.document_id === selectedDocument?.id
+							? (targetCitation?.citation.page ?? null)
 							: null
 					}
+					targetPageRequestId={targetCitation?.requestId ?? null}
 				/>
 			</div>
 		</TooltipProvider>
