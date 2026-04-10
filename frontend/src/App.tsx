@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { ChatSidebar } from "./components/ChatSidebar";
 import { ChatWindow } from "./components/ChatWindow";
 import { DocumentViewer } from "./components/DocumentViewer";
@@ -6,8 +6,11 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
 import { useDocuments } from "./hooks/use-documents";
 import { useMessages } from "./hooks/use-messages";
+import type { Citation } from "./types";
 
 export default function App() {
+	const [targetCitation, setTargetCitation] = useState<Citation | null>(null);
+
 	const {
 		conversations,
 		selectedId,
@@ -38,6 +41,7 @@ export default function App() {
 
 	const handleSend = useCallback(
 		async (content: string) => {
+			setTargetCitation(null);
 			await send(content);
 			refreshConversations();
 		},
@@ -46,6 +50,7 @@ export default function App() {
 
 	const handleUpload = useCallback(
 		async (file: File) => {
+			setTargetCitation(null);
 			const doc = await upload(file);
 			if (doc) {
 				refreshConversations();
@@ -56,10 +61,29 @@ export default function App() {
 
 	const handleDeleteDocument = useCallback(
 		async (id: string) => {
+			setTargetCitation((current) =>
+				current?.document_id === id ? null : current,
+			);
 			await removeDocument(id);
 			refreshConversations();
 		},
 		[removeDocument, refreshConversations],
+	);
+
+	const handleSelectDocument = useCallback(
+		(id: string) => {
+			setTargetCitation(null);
+			selectDocument(id);
+		},
+		[selectDocument],
+	);
+
+	const handleCitationClick = useCallback(
+		(citation: Citation) => {
+			selectDocument(citation.document_id);
+			setTargetCitation(citation);
+		},
+		[selectDocument],
 	);
 
 	const handleCreate = useCallback(async () => {
@@ -89,15 +113,21 @@ export default function App() {
 					onSend={handleSend}
 					onUpload={handleUpload}
 					canUpload={canUpload}
+					onCitationClick={handleCitationClick}
 				/>
 
 				<DocumentViewer
 					documents={documents}
 					selectedDocument={selectedDocument}
-					onSelectDocument={selectDocument}
+					onSelectDocument={handleSelectDocument}
 					onDeleteDocument={handleDeleteDocument}
 					onUpload={handleUpload}
 					canUpload={canUpload}
+					targetPage={
+						targetCitation?.document_id === selectedDocument?.id
+							? (targetCitation?.page ?? null)
+							: null
+					}
 				/>
 			</div>
 		</TooltipProvider>

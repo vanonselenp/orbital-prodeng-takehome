@@ -15,7 +15,12 @@ from takehome.db.models import Message
 from takehome.db.session import get_session
 from takehome.services.conversation import get_conversation, update_conversation
 from takehome.services.document import get_documents_for_conversation
-from takehome.services.llm import chat_with_documents, count_sources_cited, generate_title
+from takehome.services.llm import (
+    CitationContext,
+    build_grounded_response,
+    chat_with_documents,
+    generate_title,
+)
 
 logger = structlog.get_logger()
 
@@ -33,6 +38,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     sources_cited: int
+    citations: list[dict[str, object]] = []
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -76,6 +82,7 @@ async def list_messages(
             role=m.role,
             content=m.content,
             sources_cited=m.sources_cited,
+            citations=m.citations or [],
             created_at=m.created_at,
         )
         for m in messages
@@ -158,8 +165,18 @@ async def send_message(
             event_data = json.dumps({"type": "content", "content": error_msg})
             yield f"data: {event_data}\n\n"
 
-        # Count sources cited in the full response
-        sources = count_sources_cited(full_response)
+        grounded_response, citations = build_grounded_response(
+            full_response,
+            documents=[
+                CitationContext(
+                    document_id=document.id,
+                    filename=document.filename,
+                    page_count=document.page_count,
+                )
+                for document in documents_list
+            ],
+        )
+        sources = len(citations)
 
         # Save the assistant message to the database.
         # We need a fresh session since the outer one may have been closed.
@@ -169,8 +186,9 @@ async def send_message(
             assistant_message = Message(
                 conversation_id=conversation_id,
                 role="assistant",
-                content=full_response,
+                content=grounded_response,
                 sources_cited=sources,
+                citations=citations,
             )
             save_session.add(assistant_message)
             await save_session.commit()
@@ -202,6 +220,7 @@ async def send_message(
                         "role": assistant_message.role,
                         "content": assistant_message.content,
                         "sources_cited": assistant_message.sources_cited,
+                        "citations": assistant_message.citations or [],
                         "created_at": assistant_message.created_at.isoformat(),
                     },
                 }

@@ -18,6 +18,7 @@ const msg1 = {
 	role: "user" as const,
 	content: "Hello",
 	sources_cited: 0,
+	citations: [],
 	created_at: "2024-01-01T00:00:00Z",
 };
 
@@ -27,6 +28,14 @@ const msg2 = {
 	role: "assistant" as const,
 	content: "Hi there!",
 	sources_cited: 1,
+	citations: [
+		{
+			document_id: "doc-1",
+			filename: "lease.pdf",
+			page: 2,
+			label: "lease.pdf p.2",
+		},
+	],
 	created_at: "2024-01-01T00:00:01Z",
 };
 
@@ -213,9 +222,17 @@ describe("useMessages", () => {
 		const finalMsg = {
 			id: "m-final",
 			conversation_id: "conv-1",
-			role: "assistant",
+			role: "assistant" as const,
 			content: "Response",
 			sources_cited: 2,
+			citations: [
+				{
+					document_id: "doc-1",
+					filename: "lease.pdf",
+					page: 2,
+					label: "lease.pdf p.2",
+				},
+			],
 			created_at: "2024-01-01T00:00:02Z",
 		};
 
@@ -245,6 +262,7 @@ describe("useMessages", () => {
 		});
 
 		expect(result.current.streaming).toBe(false);
+		expect(result.current.messages[1]?.citations).toEqual(finalMsg.citations);
 	});
 
 	it("processes SSE with plain content field (fallback format)", async () => {
@@ -371,6 +389,7 @@ describe("useMessages", () => {
 			{
 				...msg2,
 				content: "synthetic content",
+				citations: [],
 			},
 		];
 		mockFetchMessages
@@ -438,9 +457,8 @@ describe("useMessages", () => {
 		mockFetchMessages.mockResolvedValue([]);
 
 		// Create a stream that we control
-		const resolveRead: ((value: ReadableStreamReadResult<Uint8Array>) => void) | null = null;
 		const stream = new ReadableStream<Uint8Array>({
-			start(controller) {
+			start() {
 				// We'll resolve reads manually
 			},
 			pull(controller) {

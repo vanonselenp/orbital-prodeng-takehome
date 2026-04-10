@@ -4,36 +4,114 @@ from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from takehome.services.llm import (
+    REFUSAL_MESSAGE,
+    CitationContext,
     MAX_DOCUMENT_TEXT_LENGTH,
     _truncate_documents,
+    build_grounded_response,
     chat_with_documents,
-    count_sources_cited,
     generate_title,
+    parse_citation_candidates,
 )
 
 
-def test_count_sources_cited_no_matches():
-    assert count_sources_cited("") == 0
-    assert count_sources_cited("No references here.") == 0
+def test_parse_citation_candidates_without_block():
+    answer, citations = parse_citation_candidates("No citations here.")
+
+    assert answer == "No citations here."
+    assert citations == []
 
 
-def test_count_sources_cited_section_references():
-    assert count_sources_cited("See section 3 and section 12") == 2
+def test_parse_citation_candidates_extracts_machine_readable_block():
+    response = (
+        "The lease requires landlord consent.\n"
+        "<citations>"
+        '[{"filename":"lease.pdf","page":3}]'
+        "</citations>"
+    )
+
+    answer, citations = parse_citation_candidates(response)
+
+    assert answer == "The lease requires landlord consent."
+    assert citations == [{"filename": "lease.pdf", "page": 3}]
 
 
-def test_count_sources_cited_mixed_references():
-    text = "section 1, clause 2, page 3, paragraph 4"
-    assert count_sources_cited(text) == 4
+def test_parse_citation_candidates_malformed_block_is_ignored():
+    response = "Answer<citationz></citationz><citations>{bad json}</citations>"
+
+    answer, citations = parse_citation_candidates(response)
+
+    assert answer == "Answer<citationz></citationz>"
+    assert citations == []
 
 
-def test_count_sources_cited_case_insensitive():
-    text = "Section 1 and CLAUSE 2 and Page 5"
-    assert count_sources_cited(text) == 3
+def test_parse_citation_candidates_non_list_block_is_ignored():
+    response = 'Answer<citations>{"filename":"lease.pdf","page":3}</citations>'
+
+    answer, citations = parse_citation_candidates(response)
+
+    assert answer == "Answer"
+    assert citations == []
 
 
-def test_count_sources_cited_no_number():
-    assert count_sources_cited("see the section about liability") == 0
-    assert count_sources_cited("the clause regarding indemnity") == 0
+def test_build_grounded_response_keeps_valid_citations():
+    answer, citations = build_grounded_response(
+        (
+            "The assignment clause needs consent.\n"
+            '<citations>[{"filename":"lease.pdf","page":2}]</citations>'
+        ),
+        documents=[CitationContext(document_id="doc-1", filename="lease.pdf", page_count=5)],
+    )
+
+    assert answer == "The assignment clause needs consent."
+    assert citations == [
+        {
+            "document_id": "doc-1",
+            "filename": "lease.pdf",
+            "page": 2,
+            "label": "lease.pdf p.2",
+        }
+    ]
+
+
+def test_build_grounded_response_drops_unknown_filename(caplog):
+    answer, citations = build_grounded_response(
+        'Answer<citations>[{"filename":"missing.pdf","page":1}]</citations>',
+        documents=[CitationContext(document_id="doc-1", filename="lease.pdf", page_count=5)],
+    )
+
+    assert answer == REFUSAL_MESSAGE
+    assert citations == []
+    assert "unknown_filename" in caplog.text
+
+
+def test_build_grounded_response_drops_non_integer_page(caplog):
+    answer, citations = build_grounded_response(
+        'Answer<citations>[{"filename":"lease.pdf","page":"2"}]</citations>',
+        documents=[CitationContext(document_id="doc-1", filename="lease.pdf", page_count=5)],
+    )
+
+    assert answer == REFUSAL_MESSAGE
+    assert citations == []
+    assert "invalid_page" in caplog.text
+
+
+def test_build_grounded_response_drops_out_of_range_page(caplog):
+    answer, citations = build_grounded_response(
+        'Answer<citations>[{"filename":"lease.pdf","page":9}]</citations>',
+        documents=[CitationContext(document_id="doc-1", filename="lease.pdf", page_count=5)],
+    )
+
+    assert answer == REFUSAL_MESSAGE
+    assert citations == []
+    assert "page_out_of_range" in caplog.text
+
+
+def test_build_grounded_response_refuses_when_no_valid_citations():
+    answer, citations = build_grounded_response("Unsupported answer", documents=[])
+
+    assert answer == REFUSAL_MESSAGE
+    assert citations == []
 
 
 @patch("takehome.services.llm.agent")
@@ -117,6 +195,7 @@ async def test_chat_with_documents_multi_document(mock_agent):
     assert '<document filename="deed.pdf">' in prompt
     assert "Lease content here" in prompt
     assert "Deed content here" in prompt
+    assert "<citations>" in prompt
 
 
 @patch("takehome.services.llm.agent")

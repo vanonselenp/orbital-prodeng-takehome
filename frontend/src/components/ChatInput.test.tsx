@@ -52,6 +52,9 @@ describe("ChatInput", () => {
 		// Find the send button (second button, after the paperclip)
 		const buttons = screen.getAllByRole("button");
 		const sendButton = buttons[buttons.length - 1];
+		if (sendButton === undefined) {
+			throw new Error("Expected send button");
+		}
 		await user.click(sendButton);
 
 		expect(onSend).toHaveBeenCalledWith("hello");
@@ -97,7 +100,6 @@ describe("ChatInput", () => {
 	});
 
 	it("does not send when disabled", async () => {
-		const user = userEvent.setup();
 		const onSend = vi.fn();
 		renderChatInput({ onSend, disabled: true });
 
@@ -135,7 +137,11 @@ describe("ChatInput", () => {
 
 		// Click the paperclip button (first button)
 		const buttons = screen.getAllByRole("button");
-		await user.click(buttons[0]);
+		const uploadButton = buttons[0];
+		if (uploadButton === undefined) {
+			throw new Error("Expected upload button");
+		}
+		await user.click(uploadButton);
 
 		expect(clickSpy).toHaveBeenCalled();
 	});

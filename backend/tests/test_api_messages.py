@@ -12,6 +12,8 @@ from takehome.db.models import Document, Message
 from takehome.services.conversation import create_conversation
 from takehome.web.routers.messages import MessageCreate, list_messages, send_message
 
+REFUSAL_MESSAGE = "I can't answer that from the uploaded documents with a verifiable page citation."
+
 
 async def test_list_messages_empty(db_session):
     conv = await create_conversation(db_session)
@@ -54,8 +56,22 @@ async def _collect_stream(response):
 
 
 async def _fake_chat_stream(user_message, documents, conversation_history):
-    """Fake chat_with_documents that yields canned chunks mentioning section 1."""
-    for chunk in ["Based on ", "section 1", " of the document, ", "the answer is yes."]:
+    """Fake chat_with_documents that yields text without valid citations."""
+    for chunk in [
+        "Based on lease.pdf page 1, ",
+        "the answer is yes.\n",
+        '<citations>[{"filename":"lease.pdf","page":1}]</citations>',
+    ]:
+        yield chunk
+
+
+async def _fake_grounded_chat_stream(user_message, documents, conversation_history):
+    """Fake chat_with_documents that yields text with a valid citation block."""
+    for chunk in [
+        "Based on lease.pdf page 1, ",
+        "the answer is yes.\n",
+        '<citations>[{"filename":"lease.pdf","page":1}]</citations>',
+    ]:
         yield chunk
 
 
@@ -89,14 +105,65 @@ async def test_send_message_first_message_generates_title(
     message_events = [e for e in events if e["type"] == "message"]
     done_events = [e for e in events if e["type"] == "done"]
 
-    assert len(content_events) == 4  # four chunks from our fake
+    assert len(content_events) == 3
     assert len(message_events) == 1
     assert len(done_events) == 1
-    assert done_events[0]["sources_cited"] == 1  # "section 1" matches
-    assert message_events[0]["message"]["sources_cited"] == 1
+    assert done_events[0]["sources_cited"] == 0
+    assert message_events[0]["message"]["sources_cited"] == 0
+    assert message_events[0]["message"]["citations"] == []
+    assert message_events[0]["message"]["content"] == REFUSAL_MESSAGE
+
+    stored_messages = await list_messages(conversation_id=conv.id, session=db_session)
+    assert stored_messages[-1].citations == []
+    assert stored_messages[-1].content == REFUSAL_MESSAGE
 
     # Title should have been generated (first user message)
     mock_title.assert_called_once_with("What does section 1 say?")
+
+
+@patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)
+@patch("takehome.web.routers.messages.chat_with_documents", side_effect=_fake_grounded_chat_stream)
+async def test_send_message_persists_and_streams_valid_citations(
+    mock_chat, mock_title, db_session, monkeypatch
+):
+    mock_title.return_value = "Generated Title"
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    test_factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    monkeypatch.setattr("takehome.db.session.async_session", test_factory)
+
+    conv = await create_conversation(db_session)
+    db_session.add(
+        Document(
+            conversation_id=conv.id,
+            filename="lease.pdf",
+            file_path="/tmp/lease.pdf",
+            extracted_text="--- Page 1 ---\nLease text",
+            page_count=3,
+        )
+    )
+    await db_session.commit()
+
+    body = MessageCreate(content="What does page 1 say?")
+
+    response = await send_message(conversation_id=conv.id, body=body, session=db_session)
+    events = await _collect_stream(response)
+
+    message_events = [e for e in events if e["type"] == "message"]
+    done_events = [e for e in events if e["type"] == "done"]
+    final_message = message_events[0]["message"]
+
+    assert done_events[0]["sources_cited"] == 1
+    assert final_message["sources_cited"] == 1
+    assert final_message["content"] == "Based on lease.pdf page 1, the answer is yes."
+    assert final_message["citations"][0]["filename"] == "lease.pdf"
+    assert final_message["citations"][0]["page"] == 1
+    assert final_message["citations"][0]["label"] == "lease.pdf p.1"
+
+    stored_messages = await list_messages(conversation_id=conv.id, session=db_session)
+    assert stored_messages[-1].sources_cited == 1
+    assert stored_messages[-1].citations == final_message["citations"]
 
 
 @patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)

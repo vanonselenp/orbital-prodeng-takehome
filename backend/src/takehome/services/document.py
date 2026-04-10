@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 import uuid
+from typing import cast
 
-import fitz  # PyMuPDF
+import fitz  # type: ignore[reportMissingTypeStubs] # PyMuPDF
 import structlog
 from fastapi import UploadFile
 from sqlalchemy import func, select
@@ -38,10 +39,21 @@ async def upload_document(
     if count >= MAX_DOCUMENTS_PER_CONVERSATION:
         raise ValueError("Maximum number of documents (10) reached")
 
+    original_filename = file.filename or "document.pdf"
+
+    duplicate_stmt = select(Document).where(
+        Document.conversation_id == conversation_id,
+        Document.filename == original_filename,
+    )
+    duplicate_result = await session.execute(duplicate_stmt)
+    if duplicate_result.scalar_one_or_none() is not None:
+        raise ValueError(
+            f"A document named '{original_filename}' already exists in this conversation."
+        )
+
     # Validate file type
     if file.content_type not in ("application/pdf", "application/x-pdf"):
-        filename = file.filename or ""
-        if not filename.lower().endswith(".pdf"):
+        if not original_filename.lower().endswith(".pdf"):
             raise ValueError("Only PDF files are supported.")
 
     # Read file content
@@ -54,7 +66,6 @@ async def upload_document(
         )
 
     # Generate a unique filename to avoid collisions
-    original_filename = file.filename or "document.pdf"
     unique_name = f"{uuid.uuid4().hex}_{original_filename}"
     file_path = os.path.join(settings.upload_dir, unique_name)
 
@@ -76,7 +87,7 @@ async def upload_document(
         pages: list[str] = []
         for page_num in range(page_count):
             page = doc[page_num]
-            text = page.get_text()  # type: ignore[union-attr]
+            text = cast(str, page.get_text())  # type: ignore[union-attr]
             if text.strip():
                 pages.append(f"--- Page {page_num + 1} ---\n{text}")
         extracted_text = "\n\n".join(pages)

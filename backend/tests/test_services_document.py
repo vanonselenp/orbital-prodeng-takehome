@@ -85,6 +85,17 @@ async def test_upload_multiple_documents_succeeds(db_session, tmp_upload_dir):
     assert doc1.id != doc2.id != doc3.id
 
 
+async def test_upload_document_duplicate_filename_rejected(db_session, tmp_upload_dir):
+    conv = await create_conversation(db_session)
+    first = make_upload_file(MINIMAL_PDF, filename="lease.pdf")
+    await upload_document(db_session, conv.id, first)
+
+    duplicate = make_upload_file(MINIMAL_PDF, filename="lease.pdf")
+
+    with pytest.raises(ValueError, match="already exists in this conversation"):
+        await upload_document(db_session, conv.id, duplicate)
+
+
 async def test_upload_document_at_limit_raises(db_session, tmp_upload_dir):
     """Uploading when at the 10-document limit should raise ValueError."""
     conv = await create_conversation(db_session)

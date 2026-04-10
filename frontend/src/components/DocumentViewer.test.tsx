@@ -67,6 +67,7 @@ const defaultProps = {
 	onDeleteDocument: vi.fn(),
 	onUpload: vi.fn(),
 	canUpload: true,
+	targetPage: null as number | null,
 };
 
 function renderViewer(overrides: Partial<typeof defaultProps> = {}) {
@@ -118,6 +119,9 @@ describe("DocumentViewer", () => {
 
 		const buttons = screen.getAllByRole("button");
 		const nextButton = buttons[buttons.length - 1];
+		if (nextButton === undefined) {
+			throw new Error("Expected next button");
+		}
 		fireEvent.click(nextButton);
 
 		expect(screen.getByText("Page 2 of 5")).toBeInTheDocument();
@@ -132,10 +136,16 @@ describe("DocumentViewer", () => {
 
 		const buttons = screen.getAllByRole("button");
 		const nextButton = buttons[buttons.length - 1];
+		if (nextButton === undefined) {
+			throw new Error("Expected next button");
+		}
 		fireEvent.click(nextButton);
 		expect(screen.getByText("Page 2 of 5")).toBeInTheDocument();
 
 		const prevButton = buttons[buttons.length - 2];
+		if (prevButton === undefined) {
+			throw new Error("Expected previous button");
+		}
 		fireEvent.click(prevButton);
 		expect(screen.getByText("Page 1 of 5")).toBeInTheDocument();
 	});
@@ -149,6 +159,9 @@ describe("DocumentViewer", () => {
 
 		const buttons = screen.getAllByRole("button");
 		const prevButton = buttons[buttons.length - 2];
+		if (prevButton === undefined) {
+			throw new Error("Expected previous button");
+		}
 		expect(prevButton).toBeDisabled();
 	});
 
@@ -161,6 +174,9 @@ describe("DocumentViewer", () => {
 
 		const buttons = screen.getAllByRole("button");
 		const nextButton = buttons[buttons.length - 1];
+		if (nextButton === undefined) {
+			throw new Error("Expected next button");
+		}
 		fireEvent.click(nextButton);
 
 		expect(screen.getByText("Page 2 of 2")).toBeInTheDocument();
@@ -238,6 +254,9 @@ describe("DocumentViewer", () => {
 
 		const buttons = screen.getAllByRole("button");
 		const prevButton = buttons[buttons.length - 2];
+		if (prevButton === undefined) {
+			throw new Error("Expected previous button");
+		}
 		fireEvent.click(prevButton);
 
 		expect(screen.getByText("Page 1 of 3")).toBeInTheDocument();
@@ -252,6 +271,9 @@ describe("DocumentViewer", () => {
 
 		const buttons = screen.getAllByRole("button");
 		const nextButton = buttons[buttons.length - 1];
+		if (nextButton === undefined) {
+			throw new Error("Expected next button");
+		}
 		fireEvent.click(nextButton);
 		fireEvent.click(nextButton);
 
@@ -296,7 +318,11 @@ describe("DocumentViewer", () => {
 		});
 
 		const cards = screen.getAllByTestId("document-card");
-		fireEvent.click(cards[1]);
+		const secondCard = cards[1];
+		if (secondCard === undefined) {
+			throw new Error("Expected second document card");
+		}
+		fireEvent.click(secondCard);
 
 		expect(onSelectDocument).toHaveBeenCalledWith("doc-2");
 	});
@@ -331,6 +357,19 @@ describe("DocumentViewer", () => {
 		fireEvent.change(fileInput, { target: { files: [file] } });
 
 		expect(onUpload).toHaveBeenCalledWith(file);
+	});
+
+	it("does not call onUpload when files is undefined", () => {
+		const onUpload = vi.fn();
+		renderViewer({ onUpload });
+
+		const fileInput = document.querySelector(
+			'input[type="file"]',
+		) as HTMLInputElement;
+
+		fireEvent.change(fileInput, { target: {} });
+
+		expect(onUpload).not.toHaveBeenCalled();
 	});
 
 	it("+ button disabled when canUpload is false", () => {
@@ -396,6 +435,9 @@ describe("DocumentViewer", () => {
 		});
 		const buttons = screen.getAllByRole("button");
 		const nextButton = buttons[buttons.length - 1];
+		if (nextButton === undefined) {
+			throw new Error("Expected next button");
+		}
 		fireEvent.click(nextButton);
 		expect(screen.getByText("Page 2 of 5")).toBeInTheDocument();
 
@@ -408,8 +450,62 @@ describe("DocumentViewer", () => {
 			/>,
 		);
 
+		act(() => {
+			pdfOnLoadSuccess?.({ numPages: 5 });
+		});
+
 		// Page should reset to 1
 		expect(screen.getByText("Page 1 of 5")).toBeInTheDocument();
+	});
+
+	it("navigates to the target page from props", () => {
+		renderViewer({ targetPage: 4 });
+
+		act(() => {
+			pdfOnLoadSuccess?.({ numPages: 5 });
+		});
+
+		expect(screen.getByText("Page 4 of 5")).toBeInTheDocument();
+	});
+
+	it("clamps target page to valid bounds", () => {
+		renderViewer({ targetPage: 99 });
+
+		act(() => {
+			pdfOnLoadSuccess?.({ numPages: 5 });
+		});
+
+		expect(screen.getByText("Page 5 of 5")).toBeInTheDocument();
+	});
+
+	it("applies citation navigation after switching documents", () => {
+		const { rerender } = render(
+			<DocumentViewer
+				{...defaultProps}
+				documents={[mockDocument, mockDocument2]}
+				selectedDocument={mockDocument}
+				targetPage={null}
+			/>,
+		);
+
+		act(() => {
+			pdfOnLoadSuccess?.({ numPages: 5 });
+		});
+
+		rerender(
+			<DocumentViewer
+				{...defaultProps}
+				documents={[mockDocument, mockDocument2]}
+				selectedDocument={mockDocument2}
+				targetPage={3}
+			/>,
+		);
+
+		act(() => {
+			pdfOnLoadSuccess?.({ numPages: 3 });
+		});
+
+		expect(screen.getByText("Page 3 of 3")).toBeInTheDocument();
 	});
 
 	it("X button click does not propagate to card onSelectDocument", () => {
@@ -420,5 +516,11 @@ describe("DocumentViewer", () => {
 		fireEvent.click(deleteButton);
 
 		expect(onSelectDocument).not.toHaveBeenCalled();
+	});
+
+	it("renders without a selected document when documents exist", () => {
+		renderViewer({ documents: [mockDocument], selectedDocument: null });
+
+		expect(screen.queryByTestId("pdf-document")).not.toBeInTheDocument();
 	});
 });

@@ -1,3 +1,10 @@
+export interface Citation {
+	document_id: string;
+	filename: string;
+	page: number;
+	label: string;
+}
+
 export interface Conversation {
 	id: string;
 	title: string;
@@ -12,6 +19,7 @@ export interface Message {
 	role: "user" | "assistant" | "system";
 	content: string;
 	sources_cited: number;
+	citations: Citation[];
 	created_at: string;
 }
 

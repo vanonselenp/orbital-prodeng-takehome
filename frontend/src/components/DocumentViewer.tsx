@@ -37,6 +37,7 @@ interface DocumentViewerProps {
 	onDeleteDocument: (id: string) => void;
 	onUpload: (file: File) => void;
 	canUpload: boolean;
+	targetPage?: number | null;
 }
 
 function truncateFilename(name: string, maxLen = 15): string {
@@ -51,6 +52,7 @@ export function DocumentViewer({
 	onDeleteDocument,
 	onUpload,
 	canUpload,
+	targetPage = null,
 }: DocumentViewerProps) {
 	const [numPages, setNumPages] = useState<number>(0);
 	const [currentPage, setCurrentPage] = useState(1);
@@ -68,9 +70,21 @@ export function DocumentViewer({
 	useEffect(() => {
 		if (prevSelectedDocId.current !== selectedDocId) {
 			setCurrentPage(1);
+			setNumPages(0);
+			setPdfLoading(true);
+			setPdfError(null);
 			prevSelectedDocId.current = selectedDocId;
 		}
 	});
+
+	useEffect(() => {
+		if (selectedDocument === null || targetPage === null) {
+			return;
+		}
+
+		const maxPage = numPages > 0 ? numPages : selectedDocument.page_count;
+		setCurrentPage(Math.min(maxPage, Math.max(1, targetPage)));
+	}, [numPages, selectedDocument, targetPage]);
 
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
@@ -294,6 +308,7 @@ export function DocumentViewer({
 						<Button variant="secondary" onClick={() => setDeleteTarget(null)}>
 							Cancel
 						</Button>
+						{/* v8 ignore start -- dialog confirm button only exists when deleteTarget is present; v8 still reports an unreachable branch on the guarded callback */}
 						<Button
 							variant="destructive"
 							onClick={() => {
@@ -305,6 +320,7 @@ export function DocumentViewer({
 						>
 							Delete
 						</Button>
+						{/* v8 ignore stop */}
 					</div>
 				</DialogContent>
 			</Dialog>
