@@ -1,17 +1,7 @@
-# Highest Impact Issues
+# Decisions
 
-## Hallucination / Unsourced Responses (CRITICAL)
+The highest-value issue in the beta data was trust. Looking at `data/usage_events.csv`, responses with `sources_cited = 0` were disproportionately associated with negative feedback, and a meaningful share of total responses had no cited source at all. That signal lined up directly with the qualitative feedback in `data/customer_feedback.md`: users repeatedly described the product sounding authoritative while failing to point to real document support, which made them double-check the answer manually or stop trusting the tool altogether. For lawyers using this in due diligence, an unsourced answer is not just inconvenient, it undermines the core value of the product.
 
-*Data signal*: Responses with sources_cited = 0 strongly correlate with thumbs_down feedback. Roughly 30% of all responses cite 0 sources, and these are disproportionately the ones receiving negative feedback.
+I chose to build verified citations with explicit refusal behavior when an answer cannot be grounded in the uploaded documents. I prioritized this over other plausible improvements, such as faster navigation, richer document organization, or more polished summary workflows, because the data suggested that trust and verifiability were the main blockers to retention. If users cannot rely on an answer being traceable back to a real page in a real document, improvements elsewhere do not matter much. This feature directly addresses the failure mode users called out: instead of confidently producing an unsupported answer, the system now either returns a response with validated citations or clearly says it cannot verify the answer from the documents.
 
-*Customer feedback*: This is the #1 concern across multiple firms:
-- "gave me an answer that sounds completely authoritative and is just... not in the document" (Partner, Firm A)
-- "cited a clause that doesn't exist... She doesn't trust it now" (Partner, Firm B)
-- "When it doesn't cite anything specific, I have to go find it myself anyway, so what's the point?" (Associate, Firm A)
-- "I'd pay double the licence fee if the AI would just tell me when it's not sure" (Partner, Firm A)
-
-*Impact*: This is an existential trust issue. Users are lawyers advising on multi-million pound transactions. Confident hallucination is actively dangerous and is causing user churn (the associate who "stopped" after a week). The data shows users who receive 0-source responses give thumbs_down, and some never return. Fixing this unlocks retention.
-
-*Potential actions*: Add a confidence indicator, enforce source citation requirements, surface "I don't know" when the model can't ground its answer in the document.
-
-*Action chosen*: Just enfore source citation requirements as an MVP. It should add confidence in the results, reduce hallucination risk and enable users to find the relevant references faster.
+With more time, I would improve the grounding experience rather than just the grounding rule. The next steps would be to highlight cited passages directly in the PDF viewer, capture analytics on refusal rate and citation click-through, and refine citation extraction so the model can reference specific clauses or spans instead of only page-level support. That would make the product not only safer, but also faster to use in real legal review workflows.
