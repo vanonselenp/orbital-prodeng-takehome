@@ -8,8 +8,6 @@ describe("EmptyState", () => {
 		expect(
 			screen.getByText("Upload a document to get started"),
 		).toBeInTheDocument();
-		expect(
-			screen.getByText(/Ask questions about leases/),
-		).toBeInTheDocument();
+		expect(screen.getByText(/Ask questions about leases/)).toBeInTheDocument();
 	});
 });

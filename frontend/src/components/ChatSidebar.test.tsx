@@ -21,9 +21,7 @@ const conversations: Conversation[] = [
 	},
 ];
 
-function renderSidebar(
-	props: Partial<Parameters<typeof ChatSidebar>[0]> = {},
-) {
+function renderSidebar(props: Partial<Parameters<typeof ChatSidebar>[0]> = {}) {
 	const defaultProps = {
 		conversations,
 		selectedId: null as string | null,
@@ -97,7 +95,9 @@ describe("ChatSidebar", () => {
 		const onDelete = vi.fn();
 		renderSidebar({ onDelete });
 
-		const convButton = screen.getByText("First conversation").closest("button") as HTMLElement;
+		const convButton = screen
+			.getByText("First conversation")
+			.closest("button") as HTMLElement;
 
 		// Use fireEvent for hover since framer-motion animations can interfere with userEvent
 		fireEvent.mouseEnter(convButton);
@@ -114,7 +114,9 @@ describe("ChatSidebar", () => {
 	it("hides delete button on mouse leave", () => {
 		renderSidebar();
 
-		const convButton = screen.getByText("First conversation").closest("button") as HTMLElement;
+		const convButton = screen
+			.getByText("First conversation")
+			.closest("button") as HTMLElement;
 
 		fireEvent.mouseEnter(convButton);
 		expect(screen.getByTitle("Delete conversation")).toBeInTheDocument();
@@ -128,7 +130,9 @@ describe("ChatSidebar", () => {
 		const onDelete = vi.fn();
 		renderSidebar({ onSelect, onDelete });
 
-		const convButton = screen.getByText("First conversation").closest("button") as HTMLElement;
+		const convButton = screen
+			.getByText("First conversation")
+			.closest("button") as HTMLElement;
 		fireEvent.mouseEnter(convButton);
 
 		const deleteButton = screen.getByTitle("Delete conversation");

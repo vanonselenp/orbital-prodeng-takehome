@@ -1,13 +1,32 @@
 from __future__ import annotations
 
+import json
+import logging
 import re
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
+from typing import cast
 
 from pydantic_ai import Agent
 
 from takehome.config import settings  # noqa: F401 — triggers ANTHROPIC_API_KEY export
 
+assert settings is not None
+
 MAX_DOCUMENT_TEXT_LENGTH = 150000
+REFUSAL_MESSAGE = "I can't answer that from the uploaded documents with a verifiable page citation."
+_CITATION_BLOCK_RE = re.compile(r"<citations>\s*(.*?)\s*</citations>", re.DOTALL)
+_CITATION_OPEN_TAG = "<citations>"
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class CitationContext:
+    document_id: str
+    filename: str
+    page_count: int
+
 
 agent = Agent(
     "anthropic:claude-haiku-4-5-20251001",
@@ -22,7 +41,11 @@ agent = Agent(
         "conflicts, related clauses across files, or complementary information.\n"
         "- If the answer is not in the documents, say so clearly. Do not fabricate information.\n"
         "- Be concise and precise. Lawyers value accuracy over verbosity.\n"
-        "- When you reference specific content, mention the filename, section, clause, or page."
+        "- When you reference specific content, mention the filename, section, clause, or page.\n"
+        "- End every final answer with exactly one machine-readable citation block in this format: "
+        '<citations>[{"filename":"lease.pdf","page":3}]</citations>.\n'
+        "- The citation block must contain only JSON and must be the final text in the response.\n"
+        "- If you cannot support the answer from the provided documents, return an empty citation list."
     ),
 )
 
@@ -116,6 +139,9 @@ async def chat_with_documents(
 
     # Add the current user message
     prompt_parts.append(f"User: {user_message}")
+    prompt_parts.append(
+        "\nAssistant: Respond normally, then append <citations>[...]</citations> as the final line."
+    )
 
     full_prompt = "\n".join(prompt_parts)
 
@@ -124,15 +150,121 @@ async def chat_with_documents(
             yield text
 
 
-def count_sources_cited(response: str) -> int:
-    """Count the number of references to document sections, clauses, pages, etc."""
-    patterns = [
-        r"section\s+\d+",
-        r"clause\s+\d+",
-        r"page\s+\d+",
-        r"paragraph\s+\d+",
-    ]
-    count = 0
-    for pattern in patterns:
-        count += len(re.findall(pattern, response, re.IGNORECASE))
-    return count
+def strip_partial_citation_block(response: str) -> str:
+    """Hide the machine-readable citation block from in-progress streamed text."""
+    visible_response = _CITATION_BLOCK_RE.sub("", response)
+
+    citation_start = visible_response.find(_CITATION_OPEN_TAG)
+    if citation_start != -1:
+        return visible_response[:citation_start]
+
+    for prefix_length in range(len(_CITATION_OPEN_TAG) - 1, 0, -1):
+        if visible_response.endswith(_CITATION_OPEN_TAG[:prefix_length]):
+            return visible_response[:-prefix_length]
+
+    return visible_response
+
+
+def parse_citation_candidates(response: str) -> tuple[str, list[dict[str, object]]]:
+    """Split the user-visible answer from the machine-readable citation block."""
+    matches = list(_CITATION_BLOCK_RE.finditer(response))
+    visible_response = strip_partial_citation_block(_CITATION_BLOCK_RE.sub("", response)).strip()
+    if not matches:
+        return visible_response, []
+
+    match = matches[-1]
+
+    try:
+        parsed = cast(object, json.loads(match.group(1)))
+    except json.JSONDecodeError:
+        return visible_response, []
+
+    if not isinstance(parsed, list):
+        return visible_response, []
+
+    parsed_list = cast(list[object], parsed)
+    candidates: list[dict[str, object]] = []
+    for item in parsed_list:
+        if isinstance(item, dict):
+            candidates.append(cast(dict[str, object], item))
+
+    return visible_response, candidates
+
+
+def build_grounded_response(
+    response: str, documents: list[CitationContext]
+) -> tuple[str, list[dict[str, object]]]:
+    """Return the visible answer and validated citations for persistence/UI."""
+    answer, candidates = parse_citation_candidates(response)
+    documents_by_filename: dict[str, CitationContext] = {}
+    ambiguous_filenames: set[str] = set()
+    for document in documents:
+        if document.filename in documents_by_filename:
+            ambiguous_filenames.add(document.filename)
+            continue
+        documents_by_filename[document.filename] = document
+    citations: list[dict[str, object]] = []
+
+    for candidate in candidates:
+        filename = candidate.get("filename")
+        page = candidate.get("page")
+
+        if not isinstance(filename, str):
+            logger.warning(
+                "Dropped citation candidate: reason=%s filename=%r page=%r",
+                "unknown_filename",
+                filename,
+                page,
+            )
+            continue
+
+        if filename in ambiguous_filenames:
+            logger.warning(
+                "Dropped citation candidate: reason=%s filename=%r page=%r",
+                "ambiguous_filename",
+                filename,
+                page,
+            )
+            continue
+
+        if filename not in documents_by_filename:
+            logger.warning(
+                "Dropped citation candidate: reason=%s filename=%r page=%r",
+                "unknown_filename",
+                filename,
+                page,
+            )
+            continue
+
+        if not isinstance(page, int) or isinstance(page, bool):
+            logger.warning(
+                "Dropped citation candidate: reason=%s filename=%r page=%r",
+                "invalid_page",
+                filename,
+                page,
+            )
+            continue
+
+        document = documents_by_filename[filename]
+        if page < 1 or page > document.page_count:
+            logger.warning(
+                "Dropped citation candidate: reason=%s filename=%r page=%r",
+                "page_out_of_range",
+                filename,
+                page,
+            )
+            continue
+
+        citations.append(
+            {
+                "document_id": document.document_id,
+                "filename": filename,
+                "page": page,
+                "label": f"{filename} p.{page}",
+            }
+        )
+
+    if not citations:
+        return REFUSAL_MESSAGE, []
+
+    return answer, citations

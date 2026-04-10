@@ -22,9 +22,7 @@ describe("DocumentUpload", () => {
 	it("shows uploading state", () => {
 		renderDocumentUpload({ uploading: true });
 		expect(screen.getByText("Uploading document...")).toBeInTheDocument();
-		expect(
-			screen.queryByText("Upload a PDF document"),
-		).not.toBeInTheDocument();
+		expect(screen.queryByText("Upload a PDF document")).not.toBeInTheDocument();
 	});
 
 	it("triggers file input click on button click", () => {

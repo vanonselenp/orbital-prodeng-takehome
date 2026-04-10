@@ -58,7 +58,7 @@ describe("useConversations", () => {
 			await result.current.create();
 		});
 
-		expect(result.current.conversations[0].id).toBe("new");
+		expect(result.current.conversations[0]?.id).toBe("new");
 		expect(result.current.selectedId).toBe("new");
 	});
 

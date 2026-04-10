@@ -13,6 +13,24 @@ const mockUpload = vi.fn();
 const mockRemoveDocument = vi.fn();
 const mockSelectDocument = vi.fn();
 const mockRefreshDocuments = vi.fn();
+const mockMessagesState: {
+	messages: Array<{
+		id: string;
+		conversation_id: string;
+		role: "user" | "assistant" | "system";
+		content: string;
+		sources_cited: number;
+		citations: Array<{
+			document_id: string;
+			filename: string;
+			page: number;
+			label: string;
+		}>;
+		created_at: string;
+	}>;
+} = {
+	messages: [],
+};
 
 vi.mock("./hooks/use-conversations", () => ({
 	useConversations: () => ({
@@ -36,7 +54,7 @@ vi.mock("./hooks/use-conversations", () => ({
 
 vi.mock("./hooks/use-messages", () => ({
 	useMessages: () => ({
-		messages: [],
+		messages: mockMessagesState.messages,
 		loading: false,
 		error: null,
 		streaming: false,
@@ -61,10 +79,12 @@ const mockDocumentsState: {
 		uploaded_at: string;
 	} | null;
 	canUpload: boolean;
+	error: string | null;
 } = {
 	documents: [],
 	selectedDocument: null,
 	canUpload: true,
+	error: null,
 };
 
 vi.mock("./hooks/use-documents", () => ({
@@ -72,7 +92,7 @@ vi.mock("./hooks/use-documents", () => ({
 		...mockDocumentsState,
 		selectedDocumentId: mockDocumentsState.selectedDocument?.id ?? null,
 		uploading: false,
-		error: null,
+		error: mockDocumentsState.error,
 		upload: mockUpload,
 		remove: mockRemoveDocument,
 		selectDocument: mockSelectDocument,
@@ -87,13 +107,29 @@ vi.mock("streamdown", () => ({
 vi.mock("streamdown/styles.css", () => ({}));
 
 // Mock react-pdf
-vi.mock("react-pdf", () => ({
-	Document: ({ children }: { children: React.ReactNode }) => (
-		<div data-testid="pdf-document">{children}</div>
-	),
-	Page: () => <div data-testid="pdf-page" />,
-	pdfjs: { GlobalWorkerOptions: { workerSrc: "" } },
-}));
+vi.mock("react-pdf", async () => {
+	const React = await import("react");
+
+	return {
+		Document: ({
+			children,
+			onLoadSuccess,
+		}: {
+			children: React.ReactNode;
+			onLoadSuccess?: (args: { numPages: number }) => void;
+		}) => {
+			React.useEffect(() => {
+				onLoadSuccess?.({ numPages: 5 });
+			}, [onLoadSuccess]);
+
+			return <div data-testid="pdf-document">{children}</div>;
+		},
+		Page: ({ pageNumber }: { pageNumber: number }) => (
+			<div data-testid="pdf-page">Page {pageNumber}</div>
+		),
+		pdfjs: { GlobalWorkerOptions: { workerSrc: "" } },
+	};
+});
 vi.mock("react-pdf/dist/Page/AnnotationLayer.css", () => ({}));
 vi.mock("react-pdf/dist/Page/TextLayer.css", () => ({}));
 
@@ -125,6 +161,8 @@ beforeEach(() => {
 	mockDocumentsState.documents = [];
 	mockDocumentsState.selectedDocument = null;
 	mockDocumentsState.canUpload = true;
+	mockDocumentsState.error = null;
+	mockMessagesState.messages = [];
 });
 
 describe("App", () => {
@@ -212,7 +250,8 @@ describe("App", () => {
 				uploaded_at: "2024-01-01",
 			},
 		];
-		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
 
 		render(<App />);
 
@@ -254,5 +293,201 @@ describe("App", () => {
 		});
 
 		expect(mockRefreshConversations).not.toHaveBeenCalled();
+	});
+
+	it("clicking a citation selects the cited document", async () => {
+		const user = userEvent.setup();
+		mockDocumentsState.documents = [
+			{
+				id: "doc-1",
+				conversation_id: "conv-1",
+				filename: "lease.pdf",
+				page_count: 5,
+				uploaded_at: "2024-01-01",
+			},
+		];
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
+		mockMessagesState.messages = [
+			{
+				id: "m1",
+				conversation_id: "conv-1",
+				role: "assistant",
+				content: "Answer",
+				sources_cited: 1,
+				citations: [
+					{
+						document_id: "doc-1",
+						filename: "lease.pdf",
+						page: 3,
+						label: "lease.pdf p.3",
+					},
+				],
+				created_at: "2024-01-01T00:00:00Z",
+			},
+		];
+
+		render(<App />);
+
+		await user.click(screen.getByRole("button", { name: "lease.pdf p.3" }));
+
+		expect(mockSelectDocument).toHaveBeenCalledWith("doc-1");
+	});
+
+	it("shows document upload errors in the viewer", () => {
+		mockDocumentsState.documents = [
+			{
+				id: "doc-1",
+				conversation_id: "conv-1",
+				filename: "lease.pdf",
+				page_count: 5,
+				uploaded_at: "2024-01-01",
+			},
+		];
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
+		mockDocumentsState.error =
+			"A document named 'lease.pdf' already exists in this conversation.";
+
+		render(<App />);
+
+		expect(
+			screen.getByText(
+				"A document named 'lease.pdf' already exists in this conversation.",
+			),
+		).toBeInTheDocument();
+	});
+
+	it("clicking the same citation twice re-navigates to the cited page", async () => {
+		const user = userEvent.setup();
+		mockDocumentsState.documents = [
+			{
+				id: "doc-1",
+				conversation_id: "conv-1",
+				filename: "lease.pdf",
+				page_count: 5,
+				uploaded_at: "2024-01-01",
+			},
+		];
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
+		mockMessagesState.messages = [
+			{
+				id: "m1",
+				conversation_id: "conv-1",
+				role: "assistant",
+				content: "Answer",
+				sources_cited: 1,
+				citations: [
+					{
+						document_id: "doc-1",
+						filename: "lease.pdf",
+						page: 3,
+						label: "lease.pdf p.3",
+					},
+				],
+				created_at: "2024-01-01T00:00:00Z",
+			},
+		];
+
+		render(<App />);
+
+		await user.click(screen.getByRole("button", { name: "lease.pdf p.3" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Page 3 of 5")).toBeInTheDocument();
+		});
+
+		const buttons = screen.getAllByRole("button");
+		const nextButton = buttons[buttons.length - 1];
+		if (nextButton === undefined) {
+			throw new Error("Expected next button");
+		}
+
+		await user.click(nextButton);
+
+		await waitFor(() => {
+			expect(screen.getByText("Page 4 of 5")).toBeInTheDocument();
+		});
+
+		await user.click(screen.getByRole("button", { name: "lease.pdf p.3" }));
+
+		await waitFor(() => {
+			expect(screen.getByText("Page 3 of 5")).toBeInTheDocument();
+		});
+	});
+
+	it("clicking a document card clears citation targeting path and selects manually", async () => {
+		const user = userEvent.setup();
+		mockDocumentsState.documents = [
+			{
+				id: "doc-1",
+				conversation_id: "conv-1",
+				filename: "lease.pdf",
+				page_count: 5,
+				uploaded_at: "2024-01-01",
+			},
+			{
+				id: "doc-2",
+				conversation_id: "conv-1",
+				filename: "addendum.pdf",
+				page_count: 3,
+				uploaded_at: "2024-01-02",
+			},
+		];
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
+
+		render(<App />);
+
+		const cards = screen.getAllByTestId("document-card");
+		const secondCard = cards[1];
+		if (secondCard === undefined) {
+			throw new Error("Expected second document card");
+		}
+		await user.click(secondCard);
+
+		expect(mockSelectDocument).toHaveBeenCalledWith("doc-2");
+	});
+
+	it("deleting the cited document keeps the delete flow working", async () => {
+		const user = userEvent.setup();
+		mockDocumentsState.documents = [
+			{
+				id: "doc-1",
+				conversation_id: "conv-1",
+				filename: "lease.pdf",
+				page_count: 5,
+				uploaded_at: "2024-01-01",
+			},
+		];
+		mockDocumentsState.selectedDocument =
+			mockDocumentsState.documents[0] ?? null;
+		mockMessagesState.messages = [
+			{
+				id: "m1",
+				conversation_id: "conv-1",
+				role: "assistant",
+				content: "Answer",
+				sources_cited: 1,
+				citations: [
+					{
+						document_id: "doc-1",
+						filename: "lease.pdf",
+						page: 3,
+						label: "lease.pdf p.3",
+					},
+				],
+				created_at: "2024-01-01T00:00:00Z",
+			},
+		];
+
+		render(<App />);
+
+		await user.click(screen.getByRole("button", { name: "lease.pdf p.3" }));
+		await user.click(screen.getByTitle("Delete document"));
+		await user.click(await screen.findByRole("button", { name: "Delete" }));
+
+		expect(mockRemoveDocument).toHaveBeenCalledWith("doc-1");
 	});
 });

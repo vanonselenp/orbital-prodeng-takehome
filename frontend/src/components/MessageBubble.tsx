@@ -2,13 +2,21 @@ import { motion } from "framer-motion";
 import { Bot } from "lucide-react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
-import type { Message } from "../types";
+import { stripPartialCitationBlock } from "../lib/streaming-citations";
+import type { Citation, Message } from "../types";
 
 interface MessageBubbleProps {
 	message: Message;
+	onCitationClick?: (citation: Citation) => void;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+const REFUSAL_MESSAGE =
+	"I can't answer that from the uploaded documents with a verifiable page citation.";
+
+export function MessageBubble({
+	message,
+	onCitationClick,
+}: MessageBubbleProps) {
 	if (message.role === "system") {
 		return (
 			<motion.div
@@ -40,6 +48,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 	}
 
 	// Assistant message
+	const isRefusal =
+		message.citations.length === 0 && message.content === REFUSAL_MESSAGE;
+	const bubbleClass = isRefusal
+		? "rounded-2xl rounded-tl-md bg-amber-50 px-4 py-3 ring-1 ring-amber-200"
+		: "";
+	const citationCount = message.citations.length;
+
 	return (
 		<motion.div
 			initial={{ opacity: 0, y: 8 }}
@@ -51,13 +66,27 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 				<Bot className="h-4 w-4 text-white" />
 			</div>
 			<div className="min-w-0 max-w-[80%]">
-				<div className="prose">
+				<div className={`prose ${bubbleClass}`.trim()}>
 					<Streamdown>{message.content}</Streamdown>
 				</div>
-				{message.sources_cited > 0 && (
+				{message.citations.length > 0 && (
+					<div className="mt-2 flex flex-wrap gap-2">
+						{message.citations.map((citation) => (
+							<button
+								key={`${citation.document_id}-${citation.page}`}
+								type="button"
+								className="rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-700 transition-colors hover:border-neutral-300 hover:bg-neutral-100"
+								onClick={() => onCitationClick?.(citation)}
+							>
+								{citation.label}
+							</button>
+						))}
+					</div>
+				)}
+				{citationCount > 0 && (
 					<p className="mt-1.5 text-xs text-neutral-400">
-						{message.sources_cited} source
-						{message.sources_cited !== 1 ? "s" : ""} cited
+						{citationCount} source
+						{citationCount !== 1 ? "s" : ""} cited
 					</p>
 				)}
 			</div>
@@ -70,15 +99,17 @@ interface StreamingBubbleProps {
 }
 
 export function StreamingBubble({ content }: StreamingBubbleProps) {
+	const visibleContent = stripPartialCitationBlock(content);
+
 	return (
 		<div className="flex gap-3 py-1.5">
 			<div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900">
 				<Bot className="h-4 w-4 text-white" />
 			</div>
 			<div className="min-w-0 max-w-[80%]">
-				{content ? (
+				{visibleContent ? (
 					<div className="prose">
-						<Streamdown mode="streaming">{content}</Streamdown>
+						<Streamdown mode="streaming">{visibleContent}</Streamdown>
 					</div>
 				) : (
 					<div className="flex items-center gap-1 py-2">

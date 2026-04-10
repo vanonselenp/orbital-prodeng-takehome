@@ -37,9 +37,7 @@ describe("fetchConversations", () => {
 	});
 
 	it("throws on error response", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Not Found", { status: 404 }),
-		);
+		mockFetch.mockResolvedValue(new Response("Not Found", { status: 404 }));
 		await expect(fetchConversations()).rejects.toThrow("API error 404");
 	});
 });
@@ -68,12 +66,8 @@ describe("deleteConversation", () => {
 	});
 
 	it("throws on error", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Not found", { status: 404 }),
-		);
-		await expect(deleteConversation("bad")).rejects.toThrow(
-			"API error 404",
-		);
+		mockFetch.mockResolvedValue(new Response("Not found", { status: 404 }));
+		await expect(deleteConversation("bad")).rejects.toThrow("API error 404");
 	});
 });
 
@@ -95,6 +89,31 @@ describe("fetchMessages", () => {
 			"/api/conversations/conv-1/messages",
 		);
 	});
+
+	it("deserializes citations on fetched messages", async () => {
+		const messages = [
+			{
+				id: "m1",
+				conversation_id: "conv-1",
+				role: "assistant",
+				content: "Answer",
+				sources_cited: 1,
+				citations: [
+					{
+						document_id: "doc-1",
+						filename: "lease.pdf",
+						page: 3,
+						label: "lease.pdf p.3",
+					},
+				],
+				created_at: "2024-01-01T00:00:00Z",
+			},
+		];
+
+		mockFetch.mockResolvedValue(okJson(messages));
+
+		await expect(fetchMessages("conv-1")).resolves.toEqual(messages);
+	});
 });
 
 describe("sendMessage", () => {
@@ -112,12 +131,8 @@ describe("sendMessage", () => {
 	});
 
 	it("throws on error", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Server error", { status: 500 }),
-		);
-		await expect(sendMessage("conv-1", "hi")).rejects.toThrow(
-			"API error 500",
-		);
+		mockFetch.mockResolvedValue(new Response("Server error", { status: 500 }));
+		await expect(sendMessage("conv-1", "hi")).rejects.toThrow("API error 500");
 	});
 });
 
@@ -132,6 +147,9 @@ describe("uploadDocument", () => {
 		expect(result).toEqual(doc);
 
 		const lastCall = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
+		if (lastCall === undefined) {
+			throw new Error("Expected fetch call");
+		}
 		const [url, opts] = lastCall;
 		expect(url).toBe("/api/conversations/conv-1/documents");
 		expect(opts.method).toBe("POST");
@@ -156,9 +174,7 @@ describe("deleteDocument", () => {
 	});
 
 	it("throws on non-OK response", async () => {
-		mockFetch.mockResolvedValue(
-			new Response("Not found", { status: 404 }),
-		);
+		mockFetch.mockResolvedValue(new Response("Not found", { status: 404 }));
 		await expect(deleteDocument("conv-1", "bad-id")).rejects.toThrow(
 			"API error 404",
 		);

@@ -58,6 +58,7 @@ known-first-party = ["takehome"]
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
+include = ["backend/src"]
 extraPaths = ["backend/src"]
 
 [tool.pytest.ini_options]

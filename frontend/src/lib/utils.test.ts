@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { cn, relativeTime } from "./utils";
 
 describe("cn", () => {
@@ -43,8 +43,6 @@ describe("relativeTime", () => {
 	it("returns locale date string for older dates", () => {
 		const date = new Date();
 		date.setDate(date.getDate() - 10);
-		expect(relativeTime(date.toISOString())).toBe(
-			date.toLocaleDateString(),
-		);
+		expect(relativeTime(date.toISOString())).toBe(date.toLocaleDateString());
 	});
 });

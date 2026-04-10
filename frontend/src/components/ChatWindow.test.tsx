@@ -47,6 +47,7 @@ const messages: Message[] = [
 		role: "user",
 		content: "Hello",
 		sources_cited: 0,
+		citations: [],
 		created_at: "2024-01-01T00:00:00Z",
 	},
 	{
@@ -55,6 +56,14 @@ const messages: Message[] = [
 		role: "assistant",
 		content: "Hi there!",
 		sources_cited: 2,
+		citations: [
+			{
+				document_id: "doc-1",
+				filename: "lease.pdf",
+				page: 2,
+				label: "lease.pdf p.2",
+			},
+		],
 		created_at: "2024-01-01T00:00:01Z",
 	},
 ];
@@ -73,6 +82,7 @@ function renderChatWindow(
 		onSend: vi.fn(),
 		onUpload: vi.fn(),
 		canUpload: true,
+		onCitationClick: vi.fn(),
 	};
 	return render(
 		<TooltipProvider>
@@ -166,9 +176,11 @@ describe("ChatWindow", () => {
 		).toBeInTheDocument();
 	});
 
-	it("shows sources cited for assistant messages", () => {
+	it("renders citation chips for assistant messages", () => {
 		renderChatWindow({ messages });
-		expect(screen.getByText("2 sources cited")).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "lease.pdf p.2" }),
+		).toBeInTheDocument();
 	});
 
 	it("renders system messages", () => {
@@ -178,35 +190,51 @@ describe("ChatWindow", () => {
 			role: "system",
 			content: "System notification",
 			sources_cited: 0,
+			citations: [],
 			created_at: "2024-01-01T00:00:02Z",
 		};
 		renderChatWindow({ messages: [systemMessage] });
 		expect(screen.getByText("System notification")).toBeInTheDocument();
 	});
 
-	it("shows singular 'source' for 1 source cited", () => {
+	it("forwards citation clicks", () => {
+		const onCitationClick = vi.fn();
+		renderChatWindow({ messages, onCitationClick });
+
+		screen.getByRole("button", { name: "lease.pdf p.2" }).click();
+
+		expect(onCitationClick).toHaveBeenCalledWith(messages[1]?.citations[0]);
+	});
+
+	it("does not render citation chips when assistant has none", () => {
 		const msgWith1Source: Message = {
 			id: "m4",
 			conversation_id: "conv-1",
 			role: "assistant",
 			content: "Answer",
 			sources_cited: 1,
+			citations: [],
 			created_at: "2024-01-01T00:00:03Z",
 		};
 		renderChatWindow({ messages: [msgWith1Source] });
-		expect(screen.getByText("1 source cited")).toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: /\.pdf p\./ }),
+		).not.toBeInTheDocument();
 	});
 
-	it("does not show sources cited when 0", () => {
+	it("does not render citation chips when 0", () => {
 		const msgWith0Sources: Message = {
 			id: "m5",
 			conversation_id: "conv-1",
 			role: "assistant",
 			content: "Answer here",
 			sources_cited: 0,
+			citations: [],
 			created_at: "2024-01-01T00:00:04Z",
 		};
 		renderChatWindow({ messages: [msgWith0Sources] });
-		expect(screen.queryByText(/\d+ sources? cited/)).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: /\.pdf p\./ }),
+		).not.toBeInTheDocument();
 	});
 });

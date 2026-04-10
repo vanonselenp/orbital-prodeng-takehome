@@ -65,6 +65,19 @@ async def test_upload_second_document_returns_201(db_session, tmp_upload_dir):
     assert result.filename == "second.pdf"
 
 
+async def test_upload_duplicate_filename_returns_400(db_session, tmp_upload_dir):
+    conv = await create_conversation(db_session)
+    first = make_upload_file(MINIMAL_PDF, filename="lease.pdf")
+    await upload_document_endpoint(conversation_id=conv.id, file=first, session=db_session)
+
+    duplicate = make_upload_file(MINIMAL_PDF, filename="lease.pdf")
+    with pytest.raises(HTTPException) as exc:
+        await upload_document_endpoint(conversation_id=conv.id, file=duplicate, session=db_session)
+
+    assert exc.value.status_code == 400
+    assert "already exists in this conversation" in exc.value.detail
+
+
 async def test_upload_at_limit_returns_409(db_session, tmp_upload_dir):
     """Uploading when at the 10-document limit returns 409."""
     conv = await create_conversation(db_session)
