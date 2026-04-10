@@ -122,7 +122,7 @@ async def delete_document_endpoint(
     session: AsyncSession = Depends(get_session),
 ) -> None:
     """Delete a document from a conversation."""
-    deleted = await delete_document(session, document_id)
+    deleted = await delete_document(session, document_id, conversation_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Document not found")
 

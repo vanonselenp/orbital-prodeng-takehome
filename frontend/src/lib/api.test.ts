@@ -5,7 +5,6 @@ import {
 	deleteDocument,
 	fetchConversation,
 	fetchConversations,
-	fetchDocuments,
 	fetchMessages,
 	getDocumentUrl,
 	sendMessage,
@@ -143,21 +142,6 @@ describe("uploadDocument", () => {
 describe("getDocumentUrl", () => {
 	it("returns correct URL", () => {
 		expect(getDocumentUrl("doc-1")).toBe("/api/documents/doc-1/content");
-	});
-});
-
-describe("fetchDocuments", () => {
-	it("calls GET with correct endpoint and returns Document[]", async () => {
-		const docs = [
-			{ id: "doc-1", filename: "a.pdf" },
-			{ id: "doc-2", filename: "b.pdf" },
-		];
-		mockFetch.mockResolvedValue(okJson(docs));
-		const result = await fetchDocuments("conv-1");
-		expect(result).toEqual(docs);
-		expect(mockFetch).toHaveBeenCalledWith(
-			"/api/conversations/conv-1/documents",
-		);
 	});
 });
 

@@ -46,8 +46,9 @@ def _truncate_documents(documents: list[tuple[str, str]]) -> list[tuple[str, str
     if total <= MAX_DOCUMENT_TEXT_LENGTH:
         return documents
 
-    truncation_notice = "\n[Document truncated due to length]"
-    notice_len = len(truncation_notice)
+    full_notice = "[Document truncated due to length]"
+    partial_notice = "\n" + full_notice
+    partial_notice_len = len(partial_notice)
 
     # Sort by text length descending to truncate largest first
     indexed = list(enumerate(documents))
@@ -58,18 +59,18 @@ def _truncate_documents(documents: list[tuple[str, str]]) -> list[tuple[str, str
         if total <= MAX_DOCUMENT_TEXT_LENGTH:
             break
         excess = total - MAX_DOCUMENT_TEXT_LENGTH
-        if excess >= len(text) - notice_len:
+        if excess >= len(text) - len(full_notice):
             # Replace entire doc content with just the notice
-            result[idx] = (filename, "[Document truncated due to length]")
-            total -= len(text) - len("[Document truncated due to length]")
+            result[idx] = (filename, full_notice)
+            total -= len(text) - len(full_notice)
         else:
             # Truncate from the end, accounting for the notice length
-            keep = len(text) - excess - notice_len
+            keep = len(text) - excess - partial_notice_len
             if (
                 keep < 0
             ):  # pragma: no cover — algebraically unreachable: else branch guarantees keep > 0
                 keep = 0
-            new_text = text[:keep] + truncation_notice
+            new_text = text[:keep] + partial_notice
             total -= len(text) - len(new_text)
             result[idx] = (filename, new_text)
 

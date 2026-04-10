@@ -128,6 +128,30 @@ async def test_delete_document_returns_204(db_session):
     assert len(result) == 0
 
 
+async def test_delete_document_wrong_conversation_returns_404(db_session):
+    """DELETE rejects a document that belongs to a different conversation."""
+    conv_a = await create_conversation(db_session)
+    conv_b = await create_conversation(db_session)
+    doc = Document(
+        conversation_id=conv_a.id,
+        filename="owned.pdf",
+        file_path="/nonexistent/owned.pdf",
+        page_count=1,
+    )
+    db_session.add(doc)
+    await db_session.commit()
+
+    with pytest.raises(HTTPException) as exc:
+        await delete_document_endpoint(
+            conversation_id=conv_b.id, document_id=doc.id, session=db_session
+        )
+    assert exc.value.status_code == 404
+
+    # Document should still exist in conv_a
+    result = await list_documents_endpoint(conversation_id=conv_a.id, session=db_session)
+    assert len(result) == 1
+
+
 async def test_delete_document_not_found_returns_404(db_session):
     """DELETE non-existent document returns 404."""
     conv = await create_conversation(db_session)

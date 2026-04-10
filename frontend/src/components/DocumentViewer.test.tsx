@@ -381,6 +381,37 @@ describe("DocumentViewer", () => {
 		expect(onDeleteDocument).toHaveBeenCalledWith("doc-1");
 	});
 
+	it("resets to page 1 when switching documents (FR-11)", () => {
+		const { rerender } = render(
+			<DocumentViewer
+				{...defaultProps}
+				documents={[mockDocument, mockDocument2]}
+				selectedDocument={mockDocument}
+			/>,
+		);
+
+		// Load PDF and navigate to page 2
+		act(() => {
+			pdfOnLoadSuccess?.({ numPages: 5 });
+		});
+		const buttons = screen.getAllByRole("button");
+		const nextButton = buttons[buttons.length - 1];
+		fireEvent.click(nextButton);
+		expect(screen.getByText("Page 2 of 5")).toBeInTheDocument();
+
+		// Switch to a different document
+		rerender(
+			<DocumentViewer
+				{...defaultProps}
+				documents={[mockDocument, mockDocument2]}
+				selectedDocument={mockDocument2}
+			/>,
+		);
+
+		// Page should reset to 1
+		expect(screen.getByText("Page 1 of 5")).toBeInTheDocument();
+	});
+
 	it("X button click does not propagate to card onSelectDocument", () => {
 		const onSelectDocument = vi.fn();
 		renderViewer({ documents: [mockDocument], onSelectDocument });

@@ -135,13 +135,18 @@ async def get_documents_for_conversation(
     return list(result.scalars().all())
 
 
-async def delete_document(session: AsyncSession, document_id: str) -> bool:
+async def delete_document(
+    session: AsyncSession, document_id: str, conversation_id: str | None = None
+) -> bool:
     """Delete a document record and its file from disk.
 
     Returns True if the document existed and was deleted, False if not found.
+    When conversation_id is provided, the document must belong to that conversation.
     Handles missing files on disk gracefully.
     """
     stmt = select(Document).where(Document.id == document_id)
+    if conversation_id is not None:
+        stmt = stmt.where(Document.conversation_id == conversation_id)
     result = await session.execute(stmt)
     document = result.scalar_one_or_none()
 

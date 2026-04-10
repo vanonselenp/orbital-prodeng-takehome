@@ -232,3 +232,23 @@ def test_truncation_full_replacement_branch():
         fname for fname, text in result if text == "[Document truncated due to length]"
     ]
     assert len(fully_replaced) >= 1
+
+
+def test_truncation_total_accounting_is_exact():
+    """After truncation the reported total exactly matches actual text lengths.
+
+    Regression: the full-replacement branch used a hardcoded string length that
+    differed from the truncation_notice variable by 1 (leading newline), causing
+    the running total to drift from reality.
+    """
+    # Two docs: 80k + 80k = 160k, excess = 10k. Only partial truncation of the first.
+    text_a = "a" * 80000
+    text_b = "b" * 80000
+    documents = [("a.pdf", text_a), ("b.pdf", text_b)]
+
+    result = _truncate_documents(documents)
+
+    actual_total = sum(len(text) for _, text in result)
+    assert actual_total <= MAX_DOCUMENT_TEXT_LENGTH
+    # The result should be as close to MAX as possible (no undershoot beyond notice_len)
+    assert actual_total >= MAX_DOCUMENT_TEXT_LENGTH - 100

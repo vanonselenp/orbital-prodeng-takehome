@@ -53,6 +53,18 @@ class DocumentInfo(BaseModel):
     model_config = {"from_attributes": True}
 
 
+def _to_doc_infos(documents: list) -> list[DocumentInfo]:
+    return [
+        DocumentInfo(
+            id=d.id,
+            filename=d.filename,
+            page_count=d.page_count,
+            uploaded_at=d.uploaded_at,
+        )
+        for d in documents
+    ]
+
+
 class ConversationCreate(BaseModel):
     pass
 
@@ -110,15 +122,7 @@ async def get_conversation_endpoint(
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    doc_infos = [
-        DocumentInfo(
-            id=d.id,
-            filename=d.filename,
-            page_count=d.page_count,
-            uploaded_at=d.uploaded_at,
-        )
-        for d in conversation.documents
-    ]
+    doc_infos = _to_doc_infos(conversation.documents)
 
     return ConversationDetail(
         id=conversation.id,
@@ -141,15 +145,7 @@ async def update_conversation_endpoint(
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    doc_infos = [
-        DocumentInfo(
-            id=d.id,
-            filename=d.filename,
-            page_count=d.page_count,
-            uploaded_at=d.uploaded_at,
-        )
-        for d in conversation.documents
-    ]
+    doc_infos = _to_doc_infos(conversation.documents)
 
     return ConversationDetail(
         id=conversation.id,

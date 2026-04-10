@@ -64,7 +64,6 @@ export function DocumentViewer({
 
 	// Reset page when selectedDocument changes
 	const selectedDocId = selectedDocument?.id ?? null;
-	/* v8 ignore start — ref-based effect; changing selectedDocument id within same mount is not reachable in jsdom */
 	const prevSelectedDocId = useRef(selectedDocId);
 	useEffect(() => {
 		if (prevSelectedDocId.current !== selectedDocId) {
@@ -72,7 +71,6 @@ export function DocumentViewer({
 			prevSelectedDocId.current = selectedDocId;
 		}
 	});
-	/* v8 ignore stop */
 
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
