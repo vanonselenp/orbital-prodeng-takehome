@@ -15,7 +15,7 @@ export function useDocument(conversationId: string | null) {
 		try {
 			setError(null);
 			const detail = await api.fetchConversation(conversationId);
-			setDocument(detail.document ?? null);
+			setDocument(detail.documents[0] ?? null);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Failed to load document");
 		}

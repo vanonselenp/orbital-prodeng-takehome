@@ -7,14 +7,14 @@ interface ChatInputProps {
 	onSend: (content: string) => void;
 	onUpload: (file: File) => void;
 	disabled: boolean;
-	hasDocument: boolean;
+	canUpload: boolean;
 }
 
 export function ChatInput({
 	onSend,
 	onUpload,
 	disabled,
-	hasDocument,
+	canUpload,
 }: ChatInputProps) {
 	const [value, setValue] = useState("");
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -77,16 +77,16 @@ export function ChatInput({
 								variant="ghost"
 								size="icon"
 								className="h-8 w-8 flex-shrink-0"
-								disabled={hasDocument}
+								disabled={!canUpload}
 								onClick={() => fileInputRef.current?.click()}
 							>
 								<Paperclip className="h-4 w-4 text-neutral-500" />
 							</Button>
 						</div>
 					</TooltipTrigger>
-					{hasDocument && (
-						<TooltipContent>Document already uploaded</TooltipContent>
-					)}
+					<TooltipContent>
+						{canUpload ? "Attach PDF document" : "Maximum documents reached"}
+					</TooltipContent>
 				</Tooltip>
 
 				<input

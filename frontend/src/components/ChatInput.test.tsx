@@ -11,7 +11,7 @@ function renderChatInput(props: Partial<Parameters<typeof ChatInput>[0]> = {}) {
 		onSend: vi.fn(),
 		onUpload: vi.fn(),
 		disabled: false,
-		hasDocument: false,
+		canUpload: true,
 	};
 	return render(
 		<TooltipProvider>
@@ -108,11 +108,17 @@ describe("ChatInput", () => {
 		expect(textarea).toBeDisabled();
 	});
 
-	it("disables paperclip button when hasDocument is true", () => {
-		renderChatInput({ hasDocument: true });
+	it("disables paperclip button when canUpload is false", () => {
+		renderChatInput({ canUpload: false });
 		const buttons = screen.getAllByRole("button");
 		// First button is the paperclip/attach button
 		expect(buttons[0]).toBeDisabled();
+	});
+
+	it("enables paperclip button when canUpload is true", () => {
+		renderChatInput({ canUpload: true });
+		const buttons = screen.getAllByRole("button");
+		expect(buttons[0]).not.toBeDisabled();
 	});
 
 	it("triggers file input when paperclip button is clicked", async () => {

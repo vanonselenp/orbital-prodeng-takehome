@@ -10,7 +10,9 @@ const mockRemove = vi.fn();
 const mockRefreshConversations = vi.fn();
 const mockSend = vi.fn();
 const mockUpload = vi.fn();
-const mockRefreshDocument = vi.fn();
+const mockRemoveDocument = vi.fn();
+const mockSelectDocument = vi.fn();
+const mockRefreshDocuments = vi.fn();
 
 vi.mock("./hooks/use-conversations", () => ({
 	useConversations: () => ({
@@ -20,7 +22,7 @@ vi.mock("./hooks/use-conversations", () => ({
 				title: "Test Conversation",
 				created_at: "2024-01-01",
 				updated_at: new Date().toISOString(),
-				has_document: false,
+				document_count: 0,
 			},
 		],
 		selectedId: "conv-1",
@@ -43,11 +45,38 @@ vi.mock("./hooks/use-messages", () => ({
 	}),
 }));
 
-vi.mock("./hooks/use-document", () => ({
-	useDocument: () => ({
-		document: null,
+const mockDocumentsState: {
+	documents: Array<{
+		id: string;
+		conversation_id: string;
+		filename: string;
+		page_count: number;
+		uploaded_at: string;
+	}>;
+	selectedDocument: {
+		id: string;
+		conversation_id: string;
+		filename: string;
+		page_count: number;
+		uploaded_at: string;
+	} | null;
+	canUpload: boolean;
+} = {
+	documents: [],
+	selectedDocument: null,
+	canUpload: true,
+};
+
+vi.mock("./hooks/use-documents", () => ({
+	useDocuments: () => ({
+		...mockDocumentsState,
+		selectedDocumentId: mockDocumentsState.selectedDocument?.id ?? null,
+		uploading: false,
+		error: null,
 		upload: mockUpload,
-		refresh: mockRefreshDocument,
+		remove: mockRemoveDocument,
+		selectDocument: mockSelectDocument,
+		refresh: mockRefreshDocuments,
 	}),
 }));
 
@@ -89,9 +118,13 @@ beforeEach(() => {
 		title: "New conversation",
 		created_at: "2024-01-01",
 		updated_at: "2024-01-01",
-		has_document: false,
+		document_count: 0,
 	});
 	mockUpload.mockResolvedValue(null);
+	mockRemoveDocument.mockResolvedValue(undefined);
+	mockDocumentsState.documents = [];
+	mockDocumentsState.selectedDocument = null;
+	mockDocumentsState.canUpload = true;
 });
 
 describe("App", () => {
@@ -99,7 +132,7 @@ describe("App", () => {
 		render(<App />);
 		// Sidebar shows "Chats"
 		expect(screen.getByText("Chats")).toBeInTheDocument();
-		// Document viewer shows "No document uploaded" since document is null
+		// Document viewer shows "No document uploaded" since documents is empty
 		expect(screen.getByText("No document uploaded")).toBeInTheDocument();
 	});
 
@@ -156,7 +189,6 @@ describe("App", () => {
 		});
 
 		await act(async () => {
-			// The file input's onChange triggers handleUpload via ChatInput's onUpload -> App's handleUpload
 			Object.defineProperty(fileInput, "files", { value: [file] });
 			fileInput.dispatchEvent(new Event("change", { bubbles: true }));
 		});
@@ -165,7 +197,37 @@ describe("App", () => {
 			expect(mockUpload).toHaveBeenCalledWith(file);
 		});
 		await waitFor(() => {
-			expect(mockRefreshDocument).toHaveBeenCalled();
+			expect(mockRefreshConversations).toHaveBeenCalled();
+		});
+	});
+
+	it("calls removeDocument and refreshConversations in handleDeleteDocument", async () => {
+		const user = userEvent.setup();
+		mockDocumentsState.documents = [
+			{
+				id: "doc-1",
+				conversation_id: "conv-1",
+				filename: "test.pdf",
+				page_count: 3,
+				uploaded_at: "2024-01-01",
+			},
+		];
+		mockDocumentsState.selectedDocument = mockDocumentsState.documents[0] ?? null;
+
+		render(<App />);
+
+		// Click the X (delete) button on the document card
+		const deleteBtn = screen.getByTitle("Delete document");
+		await user.click(deleteBtn);
+
+		// Confirm in the dialog
+		const confirmBtn = await screen.findByRole("button", { name: "Delete" });
+		await user.click(confirmBtn);
+
+		await waitFor(() => {
+			expect(mockRemoveDocument).toHaveBeenCalledWith("doc-1");
+		});
+		await waitFor(() => {
 			expect(mockRefreshConversations).toHaveBeenCalled();
 		});
 	});
@@ -191,7 +253,6 @@ describe("App", () => {
 			expect(mockUpload).toHaveBeenCalledWith(file);
 		});
 
-		expect(mockRefreshDocument).not.toHaveBeenCalled();
 		expect(mockRefreshConversations).not.toHaveBeenCalled();
 	});
 });

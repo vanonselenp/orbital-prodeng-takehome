@@ -1,4 +1,5 @@
 """Unit tests for message router endpoints (direct-call, see conversations test note)."""
+
 from __future__ import annotations
 
 import json
@@ -48,12 +49,12 @@ async def _collect_stream(response):
         text = chunk.decode() if isinstance(chunk, bytes) else chunk
         for line in text.strip().split("\n\n"):
             if line.startswith("data: "):
-                events.append(json.loads(line[len("data: "):]))
+                events.append(json.loads(line[len("data: ") :]))
     return events
 
 
-async def _fake_chat_stream(user_message, document_text, conversation_history):
-    """Fake chat_with_document that yields canned chunks mentioning section 1."""
+async def _fake_chat_stream(user_message, documents, conversation_history):
+    """Fake chat_with_documents that yields canned chunks mentioning section 1."""
     for chunk in ["Based on ", "section 1", " of the document, ", "the answer is yes."]:
         yield chunk
 
@@ -66,21 +67,15 @@ async def test_send_message_conversation_not_found(db_session):
 
 
 @patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)
-@patch("takehome.web.routers.messages.chat_with_document", side_effect=_fake_chat_stream)
+@patch("takehome.web.routers.messages.chat_with_documents", side_effect=_fake_chat_stream)
 async def test_send_message_first_message_generates_title(
     mock_chat, mock_title, db_session, monkeypatch
 ):
     mock_title.return_value = "Generated Title"
 
-    # Patch async_session to return a session bound to the same in-memory engine
-    from takehome.db.session import async_session as real_factory
-    from takehome.web.routers import messages as msg_module
-
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    test_factory = async_sessionmaker(
-        db_session.bind, expire_on_commit=False
-    )
+    test_factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
     monkeypatch.setattr("takehome.db.session.async_session", test_factory)
 
     conv = await create_conversation(db_session)
@@ -105,7 +100,7 @@ async def test_send_message_first_message_generates_title(
 
 
 @patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)
-@patch("takehome.web.routers.messages.chat_with_document", side_effect=_fake_chat_stream)
+@patch("takehome.web.routers.messages.chat_with_documents", side_effect=_fake_chat_stream)
 async def test_send_message_subsequent_message_no_title(
     mock_chat, mock_title, db_session, monkeypatch
 ):
@@ -128,10 +123,9 @@ async def test_send_message_subsequent_message_no_title(
 
 
 @patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)
-@patch("takehome.web.routers.messages.chat_with_document", side_effect=_fake_chat_stream)
-async def test_send_message_with_document(
-    mock_chat, mock_title, db_session, monkeypatch
-):
+@patch("takehome.web.routers.messages.chat_with_documents", side_effect=_fake_chat_stream)
+async def test_send_message_with_two_documents(mock_chat, mock_title, db_session, monkeypatch):
+    """When conversation has 2 documents, both are passed to chat_with_documents."""
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
     test_factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
@@ -148,27 +142,55 @@ async def test_send_message_with_document(
             page_count=1,
         )
     )
+    db_session.add(
+        Document(
+            conversation_id=conv.id,
+            filename="deed.pdf",
+            file_path="/tmp/deed.pdf",
+            extracted_text="Deed content here.",
+            page_count=2,
+        )
+    )
     await db_session.commit()
 
     body = MessageCreate(content="What is this?")
     response = await send_message(conversation_id=conv.id, body=body, session=db_session)
     await _collect_stream(response)
 
-    # Verify chat_with_document was called with the document text
+    # Verify chat_with_documents was called with both documents
     call_kwargs = mock_chat.call_args.kwargs
-    assert call_kwargs["document_text"] == "Section 1: This is a lease."
+    assert len(call_kwargs["documents"]) == 2
+    filenames = {d[0] for d in call_kwargs["documents"]}
+    assert filenames == {"lease.pdf", "deed.pdf"}
 
 
-async def _failing_chat_stream(user_message, document_text, conversation_history):
+@patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)
+@patch("takehome.web.routers.messages.chat_with_documents", side_effect=_fake_chat_stream)
+async def test_send_message_with_zero_documents(mock_chat, mock_title, db_session, monkeypatch):
+    """When conversation has 0 documents, empty list is passed."""
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    test_factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    monkeypatch.setattr("takehome.db.session.async_session", test_factory)
+    mock_title.return_value = "T"
+
+    conv = await create_conversation(db_session)
+    body = MessageCreate(content="hi")
+    response = await send_message(conversation_id=conv.id, body=body, session=db_session)
+    await _collect_stream(response)
+
+    call_kwargs = mock_chat.call_args.kwargs
+    assert call_kwargs["documents"] == []
+
+
+async def _failing_chat_stream(user_message, documents, conversation_history):
     raise RuntimeError("LLM exploded")
     yield  # unreachable, makes this an async generator
 
 
 @patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)
-@patch("takehome.web.routers.messages.chat_with_document", side_effect=_failing_chat_stream)
-async def test_send_message_llm_error_handled(
-    mock_chat, mock_title, db_session, monkeypatch
-):
+@patch("takehome.web.routers.messages.chat_with_documents", side_effect=_failing_chat_stream)
+async def test_send_message_llm_error_handled(mock_chat, mock_title, db_session, monkeypatch):
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
     test_factory = async_sessionmaker(db_session.bind, expire_on_commit=False)
@@ -187,7 +209,7 @@ async def test_send_message_llm_error_handled(
 
 
 @patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)
-@patch("takehome.web.routers.messages.chat_with_document", side_effect=_fake_chat_stream)
+@patch("takehome.web.routers.messages.chat_with_documents", side_effect=_fake_chat_stream)
 async def test_send_message_title_generation_failure_is_swallowed(
     mock_chat, mock_title, db_session, monkeypatch
 ):

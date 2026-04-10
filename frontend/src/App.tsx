@@ -4,7 +4,7 @@ import { ChatWindow } from "./components/ChatWindow";
 import { DocumentViewer } from "./components/DocumentViewer";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useConversations } from "./hooks/use-conversations";
-import { useDocument } from "./hooks/use-document";
+import { useDocuments } from "./hooks/use-documents";
 import { useMessages } from "./hooks/use-messages";
 
 export default function App() {
@@ -28,10 +28,13 @@ export default function App() {
 	} = useMessages(selectedId);
 
 	const {
-		document,
+		documents,
+		selectedDocument,
+		canUpload,
 		upload,
-		refresh: refreshDocument,
-	} = useDocument(selectedId);
+		remove: removeDocument,
+		selectDocument,
+	} = useDocuments(selectedId);
 
 	const handleSend = useCallback(
 		async (content: string) => {
@@ -45,11 +48,18 @@ export default function App() {
 		async (file: File) => {
 			const doc = await upload(file);
 			if (doc) {
-				refreshDocument();
 				refreshConversations();
 			}
 		},
-		[upload, refreshDocument, refreshConversations],
+		[upload, refreshConversations],
+	);
+
+	const handleDeleteDocument = useCallback(
+		async (id: string) => {
+			await removeDocument(id);
+			refreshConversations();
+		},
+		[removeDocument, refreshConversations],
 	);
 
 	const handleCreate = useCallback(async () => {
@@ -74,13 +84,21 @@ export default function App() {
 					error={messagesError}
 					streaming={streaming}
 					streamingContent={streamingContent}
-					hasDocument={!!document}
+					hasDocuments={documents.length > 0}
 					conversationId={selectedId}
 					onSend={handleSend}
 					onUpload={handleUpload}
+					canUpload={canUpload}
 				/>
 
-				<DocumentViewer document={document} />
+				<DocumentViewer
+					documents={documents}
+					selectedDocument={selectedDocument}
+					onSelectDocument={selectDocument}
+					onDeleteDocument={handleDeleteDocument}
+					onUpload={handleUpload}
+					canUpload={canUpload}
+				/>
 			</div>
 		</TooltipProvider>
 	);

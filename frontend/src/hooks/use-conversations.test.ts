@@ -19,14 +19,14 @@ const conv1 = {
 	title: "First",
 	created_at: "2024-01-01",
 	updated_at: "2024-01-01",
-	has_document: false,
+	document_count: 0,
 };
 const conv2 = {
 	id: "2",
 	title: "Second",
 	created_at: "2024-01-02",
 	updated_at: "2024-01-02",
-	has_document: true,
+	document_count: 1,
 };
 
 beforeEach(() => {

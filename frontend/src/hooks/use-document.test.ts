@@ -39,8 +39,8 @@ describe("useDocument", () => {
 			title: "Test",
 			created_at: "2024-01-01",
 			updated_at: "2024-01-01",
-			has_document: true,
-			document: mockDocument,
+			document_count: 1,
+			documents: [mockDocument],
 		});
 
 		const { result } = renderHook(() => useDocument("conv-1"));
@@ -57,7 +57,8 @@ describe("useDocument", () => {
 			title: "Test",
 			created_at: "2024-01-01",
 			updated_at: "2024-01-01",
-			has_document: false,
+			document_count: 0,
+			documents: [],
 		});
 
 		const { result } = renderHook(() => useDocument("conv-1"));
@@ -94,7 +95,8 @@ describe("useDocument", () => {
 			title: "Test",
 			created_at: "2024-01-01",
 			updated_at: "2024-01-01",
-			has_document: false,
+			document_count: 0,
+			documents: [],
 		});
 		mockUploadDocument.mockResolvedValue(mockDocument);
 
@@ -138,7 +140,8 @@ describe("useDocument", () => {
 			title: "Test",
 			created_at: "2024-01-01",
 			updated_at: "2024-01-01",
-			has_document: false,
+			document_count: 0,
+			documents: [],
 		});
 		mockUploadDocument.mockRejectedValue(new Error("Upload failed"));
 
@@ -167,7 +170,8 @@ describe("useDocument", () => {
 			title: "Test",
 			created_at: "2024-01-01",
 			updated_at: "2024-01-01",
-			has_document: false,
+			document_count: 0,
+			documents: [],
 		});
 		mockUploadDocument.mockRejectedValue("bad");
 
@@ -193,7 +197,8 @@ describe("useDocument", () => {
 			title: "Test",
 			created_at: "2024-01-01",
 			updated_at: "2024-01-01",
-			has_document: false,
+			document_count: 0,
+			documents: [],
 		});
 
 		const { result } = renderHook(() => useDocument("conv-1"));
@@ -206,8 +211,8 @@ describe("useDocument", () => {
 			title: "Test",
 			created_at: "2024-01-01",
 			updated_at: "2024-01-01",
-			has_document: true,
-			document: mockDocument,
+			document_count: 1,
+			documents: [mockDocument],
 		});
 
 		await act(async () => {

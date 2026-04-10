@@ -88,6 +88,33 @@ export async function uploadDocument(
 	return handleResponse<Document>(res);
 }
 
+export async function fetchDocuments(
+	conversationId: string,
+): Promise<Document[]> {
+	const res = await fetch(
+		`${BASE}/conversations/${conversationId}/documents`,
+	);
+	return handleResponse<Document[]>(res);
+}
+
+export async function deleteDocument(
+	conversationId: string,
+	documentId: string,
+): Promise<void> {
+	const res = await fetch(
+		`${BASE}/conversations/${conversationId}/documents/${documentId}`,
+		{
+			method: "DELETE",
+		},
+	);
+	if (!res.ok) {
+		/* v8 ignore start -- Fallback for when res.text() itself rejects (e.g. corrupted/aborted response). Not reproducible with standard fetch mocks. */
+		const text = await res.text().catch(() => "Unknown error");
+		/* v8 ignore stop */
+		throw new Error(`API error ${res.status}: ${text}`);
+	}
+}
+
 export function getDocumentUrl(documentId: string): string {
 	return `${BASE}/documents/${documentId}/content`;
 }

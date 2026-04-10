@@ -10,14 +10,14 @@ const conversations: Conversation[] = [
 		title: "First conversation",
 		created_at: "2024-01-01T00:00:00Z",
 		updated_at: new Date().toISOString(),
-		has_document: false,
+		document_count: 0,
 	},
 	{
 		id: "2",
 		title: "Second conversation",
 		created_at: "2024-01-02T00:00:00Z",
 		updated_at: new Date().toISOString(),
-		has_document: true,
+		document_count: 1,
 	},
 ];
 
@@ -144,5 +144,27 @@ describe("ChatSidebar", () => {
 		// The conversations have updated_at set to now, so they should show "just now"
 		const timeElements = screen.getAllByText("just now");
 		expect(timeElements.length).toBe(2);
+	});
+
+	it("shows document count badge when document_count > 0", () => {
+		renderSidebar();
+		// Second conversation has document_count: 1
+		expect(screen.getByText("1")).toBeInTheDocument();
+	});
+
+	it("does not show document count badge when document_count is 0", () => {
+		renderSidebar({
+			conversations: [
+				{
+					id: "1",
+					title: "No docs",
+					created_at: "2024-01-01T00:00:00Z",
+					updated_at: new Date().toISOString(),
+					document_count: 0,
+				},
+			],
+		});
+		// No badge should be rendered
+		expect(screen.queryByText("0")).not.toBeInTheDocument();
 	});
 });

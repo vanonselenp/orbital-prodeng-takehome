@@ -68,10 +68,11 @@ function renderChatWindow(
 		error: null as string | null,
 		streaming: false,
 		streamingContent: "",
-		hasDocument: false,
+		hasDocuments: false,
 		conversationId: "conv-1" as string | null,
 		onSend: vi.fn(),
 		onUpload: vi.fn(),
+		canUpload: true,
 	};
 	return render(
 		<TooltipProvider>
@@ -96,14 +97,14 @@ describe("ChatWindow", () => {
 	});
 
 	it("shows EmptyState when no messages, not streaming, and no document", () => {
-		renderChatWindow({ messages: [], hasDocument: false });
+		renderChatWindow({ messages: [], hasDocuments: false });
 		expect(
 			screen.getByText("Upload a document to get started"),
 		).toBeInTheDocument();
 	});
 
 	it("shows 'Document uploaded' prompt when no messages but has document", () => {
-		renderChatWindow({ messages: [], hasDocument: true });
+		renderChatWindow({ messages: [], hasDocuments: true });
 		expect(
 			screen.getByText("Document uploaded. Ask a question to get started."),
 		).toBeInTheDocument();
@@ -151,14 +152,14 @@ describe("ChatWindow", () => {
 	});
 
 	it("renders ChatInput in empty state with document uploaded", () => {
-		renderChatWindow({ messages: [], hasDocument: true });
+		renderChatWindow({ messages: [], hasDocuments: true });
 		expect(
 			screen.getByPlaceholderText("Ask a question about your document..."),
 		).toBeInTheDocument();
 	});
 
 	it("renders ChatInput in empty state without document", () => {
-		renderChatWindow({ messages: [], hasDocument: false });
+		renderChatWindow({ messages: [], hasDocuments: false });
 		// ChatInput is rendered inside EmptyState layout
 		expect(
 			screen.getByPlaceholderText("Ask a question about your document..."),

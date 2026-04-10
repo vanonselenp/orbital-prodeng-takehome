@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { MessageSquarePlus, Trash2 } from "lucide-react";
+import { FileText, MessageSquarePlus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { relativeTime } from "../lib/utils";
 import type { Conversation } from "../types";
@@ -74,9 +74,17 @@ export function ChatSidebar({
 									onMouseLeave={() => setHoveredId(null)}
 								>
 									<div className="min-w-0 flex-1 overflow-hidden">
-										<p className="truncate text-sm font-medium text-neutral-800">
-											{conversation.title}
-										</p>
+										<div className="flex items-center gap-1.5">
+											<p className="truncate text-sm font-medium text-neutral-800">
+												{conversation.title}
+											</p>
+											{conversation.document_count > 0 && (
+												<span className="flex flex-shrink-0 items-center gap-0.5 rounded-full bg-neutral-100 px-1.5 py-0.5 text-[10px] text-neutral-500">
+													<FileText className="h-2.5 w-2.5" />
+													{conversation.document_count}
+												</span>
+											)}
+										</div>
 										<p className="mt-0.5 text-xs text-neutral-400">
 											{relativeTime(conversation.updated_at)}
 										</p>

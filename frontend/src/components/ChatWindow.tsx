@@ -11,10 +11,11 @@ interface ChatWindowProps {
 	error: string | null;
 	streaming: boolean;
 	streamingContent: string;
-	hasDocument: boolean;
+	hasDocuments: boolean;
 	conversationId: string | null;
 	onSend: (content: string) => void;
 	onUpload: (file: File) => void;
+	canUpload: boolean;
 }
 
 export function ChatWindow({
@@ -23,10 +24,11 @@ export function ChatWindow({
 	error,
 	streaming,
 	streamingContent,
-	hasDocument,
+	hasDocuments,
 	conversationId,
 	onSend,
 	onUpload,
+	canUpload,
 }: ChatWindowProps) {
 	const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -66,7 +68,7 @@ export function ChatWindow({
 		return (
 			<div className="flex flex-1 flex-col bg-white">
 				<div className="flex flex-1 items-center justify-center">
-					{hasDocument ? (
+					{hasDocuments ? (
 						<div className="text-center">
 							<p className="text-sm text-neutral-500">
 								Document uploaded. Ask a question to get started.
@@ -80,7 +82,7 @@ export function ChatWindow({
 					onSend={onSend}
 					onUpload={onUpload}
 					disabled={streaming}
-					hasDocument={hasDocument}
+					canUpload={canUpload}
 				/>
 			</div>
 		);
@@ -107,7 +109,7 @@ export function ChatWindow({
 				onSend={onSend}
 				onUpload={onUpload}
 				disabled={streaming}
-				hasDocument={hasDocument}
+				canUpload={canUpload}
 			/>
 		</div>
 	);

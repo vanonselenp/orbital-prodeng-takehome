@@ -52,26 +52,47 @@ const mockDocument: Document = {
 	uploaded_at: "2024-01-01T00:00:00Z",
 };
 
+const mockDocument2: Document = {
+	id: "doc-2",
+	conversation_id: "conv-1",
+	filename: "second-document.pdf",
+	page_count: 3,
+	uploaded_at: "2024-01-02T00:00:00Z",
+};
+
+const defaultProps = {
+	documents: [mockDocument] as Document[],
+	selectedDocument: mockDocument as Document | null,
+	onSelectDocument: vi.fn(),
+	onDeleteDocument: vi.fn(),
+	onUpload: vi.fn(),
+	canUpload: true,
+};
+
+function renderViewer(overrides: Partial<typeof defaultProps> = {}) {
+	return render(<DocumentViewer {...defaultProps} {...overrides} />);
+}
+
 describe("DocumentViewer", () => {
-	it("shows empty state when no document is provided", () => {
-		render(<DocumentViewer document={null} />);
+	it("shows empty state when documents array is empty", () => {
+		renderViewer({ documents: [], selectedDocument: null });
 		expect(screen.getByText("No document uploaded")).toBeInTheDocument();
 	});
 
 	it("renders document filename and page count", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 		expect(screen.getByText("test-document.pdf")).toBeInTheDocument();
 		expect(screen.getByText("5 pages")).toBeInTheDocument();
 	});
 
 	it("shows singular 'page' for 1 page document", () => {
 		const singlePageDoc = { ...mockDocument, page_count: 1 };
-		render(<DocumentViewer document={singlePageDoc} />);
+		renderViewer({ selectedDocument: singlePageDoc });
 		expect(screen.getByText("1 page")).toBeInTheDocument();
 	});
 
 	it("renders PDF document with correct URL", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 		const pdfDoc = screen.getByTestId("pdf-document");
 		expect(pdfDoc.getAttribute("data-file")).toBe(
 			"/api/documents/doc-1/content",
@@ -79,7 +100,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("shows page navigation after PDF loads", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 5 });
@@ -89,7 +110,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("navigates to next page", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 5 });
@@ -103,7 +124,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("navigates to previous page", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 5 });
@@ -120,7 +141,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("disables previous button on first page", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 5 });
@@ -132,7 +153,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("disables next button on last page", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 2 });
@@ -147,7 +168,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("shows PDF error when load fails", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadError?.(new Error("Could not load"));
@@ -159,52 +180,41 @@ describe("DocumentViewer", () => {
 	});
 
 	it("handles resize via mouse drag", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		const resizeHandle = document.querySelector(
 			".cursor-col-resize",
 		) as HTMLElement;
 		expect(resizeHandle).toBeTruthy();
 
-		// Start dragging
 		fireEvent.mouseDown(resizeHandle, { clientX: 400 });
-
-		// Move mouse (delta = 400 - 350 = 50, new width = 400 + 50 = 450)
 		fireEvent.mouseMove(window, { clientX: 350 });
-
-		// Release
 		fireEvent.mouseUp(window);
 	});
 
 	it("clamps resize width to minimum", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		const resizeHandle = document.querySelector(
 			".cursor-col-resize",
 		) as HTMLElement;
 
-		// Start dragging from width 400, drag right (reduces width since handle is on left)
 		fireEvent.mouseDown(resizeHandle, { clientX: 400 });
-
-		// Move far right - clientX increase means delta is negative, width decreases
 		fireEvent.mouseMove(window, { clientX: 800 });
 
-		// Width should be clamped to MIN_WIDTH (280)
 		const container = resizeHandle.parentElement as HTMLElement;
-		// The width is set inline via style
 		expect(container.style.width).toBeDefined();
 
 		fireEvent.mouseUp(window);
 	});
 
 	it("clamps resize width to maximum", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		const resizeHandle = document.querySelector(
 			".cursor-col-resize",
 		) as HTMLElement;
 
-		// Start dragging, drag far left (increases width)
 		fireEvent.mouseDown(resizeHandle, { clientX: 400 });
 		fireEvent.mouseMove(window, { clientX: -200 });
 
@@ -215,12 +225,12 @@ describe("DocumentViewer", () => {
 	});
 
 	it("does not show page navigation when numPages is 0", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 		expect(screen.queryByText(/Page \d+ of \d+/)).not.toBeInTheDocument();
 	});
 
 	it("clamps page navigation to not go below 1", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 3 });
@@ -234,7 +244,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("clamps page navigation to not exceed numPages", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 2 });
@@ -249,7 +259,7 @@ describe("DocumentViewer", () => {
 	});
 
 	it("renders Page component when PDF is loaded without error", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadSuccess?.({ numPages: 3 });
@@ -259,12 +269,125 @@ describe("DocumentViewer", () => {
 	});
 
 	it("does not render Page component when there is a PDF error", () => {
-		render(<DocumentViewer document={mockDocument} />);
+		renderViewer();
 
 		act(() => {
 			pdfOnLoadError?.(new Error("bad"));
 		});
 
 		expect(screen.queryByTestId("pdf-page")).not.toBeInTheDocument();
+	});
+
+	// US-009: Thumbnail strip tests
+	it("renders thumbnail cards for each document", () => {
+		renderViewer({ documents: [mockDocument, mockDocument2] });
+		// test-document.pdf (17 chars) truncated to "test-documen..."
+		// But "test-document.pdf" also appears in the header as selectedDocument
+		expect(screen.getByText("test-document.pdf")).toBeInTheDocument();
+		// second-document.pdf (19 chars) truncated to "second-docum..."
+		expect(screen.getByText("second-docum...")).toBeInTheDocument();
+	});
+
+	it("clicking card calls onSelectDocument with correct id", () => {
+		const onSelectDocument = vi.fn();
+		renderViewer({
+			documents: [mockDocument, mockDocument2],
+			onSelectDocument,
+		});
+
+		const cards = screen.getAllByTestId("document-card");
+		fireEvent.click(cards[1]);
+
+		expect(onSelectDocument).toHaveBeenCalledWith("doc-2");
+	});
+
+	it("selected card has highlighted style", () => {
+		renderViewer({
+			documents: [mockDocument, mockDocument2],
+			selectedDocument: mockDocument,
+		});
+
+		const cards = screen.getAllByTestId("document-card");
+		expect(cards[0]?.className).toContain("ring-2");
+		expect(cards[1]?.className).not.toContain("ring-2");
+	});
+
+	it("+ button triggers file input and calls onUpload", () => {
+		const onUpload = vi.fn();
+		renderViewer({ onUpload });
+
+		const addButton = screen.getByTitle("Add document");
+		fireEvent.click(addButton);
+
+		// Simulate file selection via the hidden input
+		const fileInput = document.querySelector(
+			'input[type="file"]',
+		) as HTMLInputElement;
+		expect(fileInput).toBeTruthy();
+
+		const file = new File(["content"], "new.pdf", {
+			type: "application/pdf",
+		});
+		fireEvent.change(fileInput, { target: { files: [file] } });
+
+		expect(onUpload).toHaveBeenCalledWith(file);
+	});
+
+	it("+ button disabled when canUpload is false", () => {
+		renderViewer({ canUpload: false });
+
+		const addButton = screen.getByTitle("Maximum documents reached");
+		expect(addButton).toBeDisabled();
+	});
+
+	// US-010: Delete confirmation dialog tests
+	it("clicking X opens confirmation dialog", () => {
+		renderViewer({ documents: [mockDocument] });
+
+		const deleteButton = screen.getByTitle("Delete document");
+		fireEvent.click(deleteButton);
+
+		expect(screen.getByText("Delete test-document.pdf?")).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				"This cannot be undone. The AI's previous answers may have referenced this document.",
+			),
+		).toBeInTheDocument();
+	});
+
+	it("clicking Cancel closes dialog without calling onDeleteDocument", () => {
+		const onDeleteDocument = vi.fn();
+		renderViewer({ documents: [mockDocument], onDeleteDocument });
+
+		const deleteButton = screen.getByTitle("Delete document");
+		fireEvent.click(deleteButton);
+
+		const cancelButton = screen.getByRole("button", { name: "Cancel" });
+		fireEvent.click(cancelButton);
+
+		expect(onDeleteDocument).not.toHaveBeenCalled();
+	});
+
+	it("clicking Delete calls onDeleteDocument with correct id", () => {
+		const onDeleteDocument = vi.fn();
+		renderViewer({ documents: [mockDocument], onDeleteDocument });
+
+		const deleteButton = screen.getByTitle("Delete document");
+		fireEvent.click(deleteButton);
+
+		const confirmDelete = screen.getByRole("button", { name: "Delete" });
+		fireEvent.click(confirmDelete);
+
+		expect(onDeleteDocument).toHaveBeenCalledWith("doc-1");
+	});
+
+	it("X button click does not propagate to card onSelectDocument", () => {
+		const onSelectDocument = vi.fn();
+		renderViewer({ documents: [mockDocument], onSelectDocument });
+
+		const deleteButton = screen.getByTitle("Delete document");
+		fireEvent.click(deleteButton);
+
+		expect(onSelectDocument).not.toHaveBeenCalled();
 	});
 });

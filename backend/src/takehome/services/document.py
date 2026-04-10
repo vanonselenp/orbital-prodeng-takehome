@@ -6,13 +6,15 @@ import uuid
 import fitz  # PyMuPDF
 import structlog
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from takehome.config import settings
 from takehome.db.models import Document
 
 logger = structlog.get_logger()
+
+MAX_DOCUMENTS_PER_CONVERSATION = 10
 
 
 async def upload_document(
@@ -23,12 +25,18 @@ async def upload_document(
     Validates the file is a PDF, saves it to disk, extracts text using PyMuPDF,
     and stores metadata in the database.
 
-    Raises ValueError if the conversation already has a document or the file is not a PDF.
+    Raises ValueError if the conversation has reached the document limit or the file is not a PDF.
     """
-    # Check if conversation already has a document
-    existing = await get_document_for_conversation(session, conversation_id)
-    if existing is not None:
-        raise ValueError("Conversation already has a document. Only one document per conversation is allowed.")
+    # Check if conversation has reached the document limit
+    stmt = (
+        select(func.count())
+        .select_from(Document)
+        .where(Document.conversation_id == conversation_id)
+    )
+    result = await session.execute(stmt)
+    count = result.scalar_one()
+    if count >= MAX_DOCUMENTS_PER_CONVERSATION:
+        raise ValueError("Maximum number of documents (10) reached")
 
     # Validate file type
     if file.content_type not in ("application/pdf", "application/x-pdf"):
@@ -112,3 +120,40 @@ async def get_document_for_conversation(
     stmt = select(Document).where(Document.conversation_id == conversation_id)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_documents_for_conversation(
+    session: AsyncSession, conversation_id: str
+) -> list[Document]:
+    """Get all documents for a conversation, ordered by uploaded_at ascending."""
+    stmt = (
+        select(Document)
+        .where(Document.conversation_id == conversation_id)
+        .order_by(Document.uploaded_at.asc())
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def delete_document(session: AsyncSession, document_id: str) -> bool:
+    """Delete a document record and its file from disk.
+
+    Returns True if the document existed and was deleted, False if not found.
+    Handles missing files on disk gracefully.
+    """
+    stmt = select(Document).where(Document.id == document_id)
+    result = await session.execute(stmt)
+    document = result.scalar_one_or_none()
+
+    if document is None:
+        return False
+
+    # Remove the file from disk, tolerating missing files
+    try:
+        os.remove(document.file_path)
+    except FileNotFoundError:
+        logger.warning("File already missing on disk", file_path=document.file_path)
+
+    await session.delete(document)
+    await session.commit()
+    return True

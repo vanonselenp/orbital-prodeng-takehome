@@ -3,7 +3,13 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from takehome.services.llm import chat_with_document, count_sources_cited, generate_title
+from takehome.services.llm import (
+    MAX_DOCUMENT_TEXT_LENGTH,
+    _truncate_documents,
+    chat_with_documents,
+    count_sources_cited,
+    generate_title,
+)
 
 
 def test_count_sources_cited_no_matches():
@@ -53,7 +59,7 @@ async def test_generate_title_truncation(mock_agent):
 
 
 # --------------------------------------------------------------------------- #
-# chat_with_document — async streaming
+# chat_with_documents — async streaming
 # --------------------------------------------------------------------------- #
 
 
@@ -77,13 +83,51 @@ def _make_streaming_agent(chunks: list[str]) -> MagicMock:
 
 
 @patch("takehome.services.llm.agent")
-async def test_chat_with_document_with_document_text(mock_agent):
+async def test_chat_with_documents_multi_document(mock_agent):
+    """Multi-document prompt has multiple <document> blocks with correct filenames."""
+    captured_prompts: list[str] = []
+
+    async def fake_stream_text(delta: bool = True):
+        yield "response"
+
+    fake_result = MagicMock()
+    fake_result.stream_text = fake_stream_text
+
+    @asynccontextmanager
+    async def capturing_run_stream(prompt: str):
+        captured_prompts.append(prompt)
+        yield fake_result
+
+    mock_agent.run_stream = capturing_run_stream
+
+    chunks = []
+    async for chunk in chat_with_documents(
+        user_message="Compare these docs",
+        documents=[
+            ("lease.pdf", "Lease content here"),
+            ("deed.pdf", "Deed content here"),
+        ],
+        conversation_history=[],
+    ):
+        chunks.append(chunk)
+
+    assert chunks == ["response"]
+    prompt = captured_prompts[0]
+    assert '<document filename="lease.pdf">' in prompt
+    assert '<document filename="deed.pdf">' in prompt
+    assert "Lease content here" in prompt
+    assert "Deed content here" in prompt
+
+
+@patch("takehome.services.llm.agent")
+async def test_chat_with_documents_single_document(mock_agent):
+    """Single document still works (backward compatible prompt structure)."""
     mock_agent.run_stream = _make_streaming_agent(["Hello ", "world"]).run_stream
 
     chunks = []
-    async for chunk in chat_with_document(
+    async for chunk in chat_with_documents(
         user_message="What is this?",
-        document_text="This is a lease document.",
+        documents=[("lease.pdf", "This is a lease document.")],
         conversation_history=[],
     ):
         chunks.append(chunk)
@@ -92,22 +136,37 @@ async def test_chat_with_document_with_document_text(mock_agent):
 
 
 @patch("takehome.services.llm.agent")
-async def test_chat_with_document_no_document(mock_agent):
-    mock_agent.run_stream = _make_streaming_agent(["ok"]).run_stream
+async def test_chat_with_documents_empty_list(mock_agent):
+    """Empty documents list produces upload-prompt message."""
+    captured_prompts: list[str] = []
+
+    async def fake_stream_text(delta: bool = True):
+        yield "ok"
+
+    fake_result = MagicMock()
+    fake_result.stream_text = fake_stream_text
+
+    @asynccontextmanager
+    async def capturing_run_stream(prompt: str):
+        captured_prompts.append(prompt)
+        yield fake_result
+
+    mock_agent.run_stream = capturing_run_stream
 
     chunks = []
-    async for chunk in chat_with_document(
+    async for chunk in chat_with_documents(
         user_message="hi",
-        document_text=None,
+        documents=[],
         conversation_history=[],
     ):
         chunks.append(chunk)
 
     assert chunks == ["ok"]
+    assert "No document has been uploaded" in captured_prompts[0]
 
 
 @patch("takehome.services.llm.agent")
-async def test_chat_with_document_with_history(mock_agent):
+async def test_chat_with_documents_with_history(mock_agent):
     mock_agent.run_stream = _make_streaming_agent(["response"]).run_stream
 
     history = [
@@ -116,11 +175,60 @@ async def test_chat_with_document_with_history(mock_agent):
         {"role": "system", "content": "ignored role"},
     ]
     chunks = []
-    async for chunk in chat_with_document(
+    async for chunk in chat_with_documents(
         user_message="follow up",
-        document_text="doc",
+        documents=[("doc.pdf", "doc content")],
         conversation_history=history,
     ):
         chunks.append(chunk)
 
     assert chunks == ["response"]
+
+
+# --------------------------------------------------------------------------- #
+# truncation logic
+# --------------------------------------------------------------------------- #
+
+
+def test_truncation_triggers_when_exceeding_limit():
+    """Truncation triggers when total text exceeds 150000 chars, largest doc is truncated."""
+    large_text = "x" * 100000
+    small_text = "y" * 60000
+    documents = [("large.pdf", large_text), ("small.pdf", small_text)]
+
+    result = _truncate_documents(documents)
+
+    # Total should now be <= MAX_DOCUMENT_TEXT_LENGTH
+    total = sum(len(text) for _, text in result)
+    assert total <= MAX_DOCUMENT_TEXT_LENGTH
+
+    # The large doc should be truncated
+    assert "[Document truncated due to length]" in result[0][1]
+    # The small doc should be unchanged
+    assert result[1][1] == small_text
+
+
+def test_truncation_no_change_when_under_limit():
+    """No truncation when total text is under the limit."""
+    documents = [("a.pdf", "short"), ("b.pdf", "also short")]
+    result = _truncate_documents(documents)
+    assert result == documents
+
+
+def test_truncation_full_replacement_branch():
+    """When excess >= len(text) - notice_len, the entire doc is replaced with notice."""
+    # 3 docs of 100k each = 300k total. Limit = 150k. Excess = 150k.
+    # Largest doc: 100k. excess(150k) >= 100k - 35 = 99965 → yes → full replacement.
+    big_text = "z" * 100000
+    documents = [("a.pdf", big_text), ("b.pdf", big_text), ("c.pdf", big_text)]
+
+    result = _truncate_documents(documents)
+
+    total = sum(len(text) for _, text in result)
+    assert total <= MAX_DOCUMENT_TEXT_LENGTH
+
+    # At least one doc should have been fully replaced (no partial content)
+    fully_replaced = [
+        fname for fname, text in result if text == "[Document truncated due to length]"
+    ]
+    assert len(fully_replaced) >= 1
