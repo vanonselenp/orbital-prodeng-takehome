@@ -11,7 +11,6 @@ from takehome.services.document import (
     MAX_DOCUMENTS_PER_CONVERSATION,
     delete_document,
     get_document,
-    get_document_for_conversation,
     get_documents_for_conversation,
     upload_document,
 )
@@ -56,27 +55,6 @@ async def test_get_document_exists(db_session):
     fetched = await get_document(db_session, doc.id)
     assert fetched is not None
     assert fetched.filename == "test.pdf"
-
-
-async def test_get_document_for_conversation_not_found(db_session):
-    result = await get_document_for_conversation(db_session, "nonexistent12345")
-    assert result is None
-
-
-async def test_get_document_for_conversation_exists(db_session):
-    conv = await create_conversation(db_session)
-    doc = Document(
-        conversation_id=conv.id,
-        filename="test.pdf",
-        file_path="/tmp/test.pdf",
-        page_count=1,
-    )
-    db_session.add(doc)
-    await db_session.flush()
-
-    fetched = await get_document_for_conversation(db_session, conv.id)
-    assert fetched is not None
-    assert fetched.id == doc.id
 
 
 async def test_upload_document_success(db_session, tmp_upload_dir):
@@ -251,3 +229,24 @@ async def test_delete_document_file_already_missing(db_session):
     # DB record should be gone
     fetched = await get_document(db_session, doc.id)
     assert fetched is None
+
+
+async def test_delete_document_wrong_conversation_returns_false(db_session):
+    """delete_document scoped by conversation_id returns False for mismatched conversation."""
+    conv_a = await create_conversation(db_session)
+    conv_b = await create_conversation(db_session)
+    doc = Document(
+        conversation_id=conv_a.id,
+        filename="scoped.pdf",
+        file_path="/nonexistent/scoped.pdf",
+        page_count=1,
+    )
+    db_session.add(doc)
+    await db_session.flush()
+
+    result = await delete_document(db_session, doc.id, conv_b.id)
+    assert result is False
+
+    # Document should still exist
+    fetched = await get_document(db_session, doc.id)
+    assert fetched is not None

@@ -113,15 +113,6 @@ async def get_document(session: AsyncSession, document_id: str) -> Document | No
     return result.scalar_one_or_none()
 
 
-async def get_document_for_conversation(
-    session: AsyncSession, conversation_id: str
-) -> Document | None:
-    """Get the document for a conversation, if one exists."""
-    stmt = select(Document).where(Document.conversation_id == conversation_id)
-    result = await session.execute(stmt)
-    return result.scalar_one_or_none()
-
-
 async def get_documents_for_conversation(
     session: AsyncSession, conversation_id: str
 ) -> list[Document]:
