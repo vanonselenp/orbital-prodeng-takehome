@@ -157,6 +157,27 @@ async def test_upload_document_removes_file_when_commit_hits_duplicate(
     assert os.listdir(tmp_upload_dir) == []
 
 
+async def test_upload_document_ignores_missing_file_during_duplicate_cleanup(
+    db_session, tmp_upload_dir, monkeypatch
+):
+    conv = await create_conversation(db_session)
+    file = make_upload_file(MINIMAL_PDF, filename="lease.pdf")
+
+    monkeypatch.setattr(
+        db_session,
+        "commit",
+        AsyncMock(side_effect=IntegrityError("insert", {}, sqlite3.IntegrityError("duplicate"))),
+    )
+
+    def raise_file_not_found(path: str) -> None:
+        raise FileNotFoundError(path)
+
+    monkeypatch.setattr("takehome.services.document.os.remove", raise_file_not_found)
+
+    with pytest.raises(ValueError, match="already exists in this conversation"):
+        await upload_document(db_session, conv.id, file)
+
+
 async def test_upload_document_at_limit_raises(db_session, tmp_upload_dir):
     """Uploading when at the 10-document limit should raise ValueError."""
     conv = await create_conversation(db_session)

@@ -327,6 +327,16 @@ describe("DocumentViewer", () => {
 		expect(onSelectDocument).toHaveBeenCalledWith("doc-2");
 	});
 
+	it("renders delete button outside the selectable card button", () => {
+		renderViewer({ documents: [mockDocument] });
+
+		const card = screen.getByTestId("document-card");
+		const deleteButton = screen.getByTitle("Delete document");
+
+		expect(card.tagName).toBe("BUTTON");
+		expect(card.contains(deleteButton)).toBe(false);
+	});
+
 	it("selected card has highlighted style", () => {
 		renderViewer({
 			documents: [mockDocument, mockDocument2],

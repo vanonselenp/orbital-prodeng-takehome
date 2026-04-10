@@ -173,31 +173,34 @@ export function DocumentViewer({
 			{/* Thumbnail strip */}
 			<div className="flex items-center gap-2 overflow-x-auto border-b border-neutral-100 px-4 py-2">
 				{documents.map((doc) => (
-					<button
+					<div
 						key={doc.id}
-						type="button"
-						data-testid="document-card"
-						className={`relative flex flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-xs transition-colors ${
+						className={`flex flex-shrink-0 items-center gap-1 rounded-md border pr-1 text-xs transition-colors ${
 							selectedDocument?.id === doc.id
 								? "border-primary ring-2 ring-primary bg-primary/5"
 								: "border-neutral-200 hover:border-neutral-300"
 						}`}
-						onClick={() => onSelectDocument(doc.id)}
 					>
-						<FileText className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400" />
-						<span className="truncate">{truncateFilename(doc.filename)}</span>
+						<button
+							type="button"
+							data-testid="document-card"
+							className={`flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-[5px] px-2 py-1.5 text-left ${
+								selectedDocument?.id === doc.id ? "ring-2 ring-primary" : ""
+							}`}
+							onClick={() => onSelectDocument(doc.id)}
+						>
+							<FileText className="h-3.5 w-3.5 flex-shrink-0 text-neutral-400" />
+							<span className="truncate">{truncateFilename(doc.filename)}</span>
+						</button>
 						<button
 							type="button"
 							title="Delete document"
-							className="ml-1 flex-shrink-0 rounded-sm p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
-							onClick={(e) => {
-								e.stopPropagation();
-								setDeleteTarget(doc);
-							}}
+							className="flex-shrink-0 rounded-sm p-0.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+							onClick={() => setDeleteTarget(doc)}
 						>
 							<X className="h-3 w-3" />
 						</button>
-					</button>
+					</div>
 				))}
 				<button
 					type="button"

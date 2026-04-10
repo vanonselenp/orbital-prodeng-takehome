@@ -100,12 +100,15 @@ async def test_send_message_first_message_generates_title(
     response = await send_message(conversation_id=conv.id, body=body, session=db_session)
     events = await _collect_stream(response)
 
-    # Unsupported content must not be streamed before citation validation completes.
     content_events = [e for e in events if e["type"] == "content"]
     message_events = [e for e in events if e["type"] == "message"]
     done_events = [e for e in events if e["type"] == "done"]
 
-    assert content_events == []
+    assert [event["content"] for event in content_events] == [
+        "Based on lease.pdf page 1, ",
+        "the answer is yes.\n",
+        '<citations>[{"filename":"lease.pdf","page":1}]</citations>',
+    ]
     assert len(message_events) == 1
     assert len(done_events) == 1
     assert done_events[0]["sources_cited"] == 0
@@ -155,7 +158,11 @@ async def test_send_message_persists_and_streams_valid_citations(
     final_message = message_events[0]["message"]
     content_events = [e for e in events if e["type"] == "content"]
 
-    assert content_events == []
+    assert [event["content"] for event in content_events] == [
+        "Based on lease.pdf page 1, ",
+        "the answer is yes.\n",
+        '<citations>[{"filename":"lease.pdf","page":1}]</citations>',
+    ]
     assert done_events[0]["sources_cited"] == 1
     assert final_message["sources_cited"] == 1
     assert final_message["content"] == "Based on lease.pdf page 1, the answer is yes."

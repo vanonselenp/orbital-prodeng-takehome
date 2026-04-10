@@ -151,6 +151,8 @@ async def send_message(
                 conversation_history=conversation_history,
             ):
                 full_response += chunk
+                event_data = json.dumps({"type": "content", "content": chunk})
+                yield f"data: {event_data}\n\n"
 
         except Exception:
             logger.exception(
