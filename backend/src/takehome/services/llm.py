@@ -16,6 +16,7 @@ assert settings is not None
 MAX_DOCUMENT_TEXT_LENGTH = 150000
 REFUSAL_MESSAGE = "I can't answer that from the uploaded documents with a verifiable page citation."
 _CITATION_BLOCK_RE = re.compile(r"<citations>\s*(.*?)\s*</citations>", re.DOTALL)
+_CITATION_OPEN_TAG = "<citations>"
 
 logger = logging.getLogger(__name__)
 
@@ -149,6 +150,21 @@ async def chat_with_documents(
             yield text
 
 
+def strip_partial_citation_block(response: str) -> str:
+    """Hide the machine-readable citation block from in-progress streamed text."""
+    visible_response = _CITATION_BLOCK_RE.sub("", response, count=1)
+
+    citation_start = visible_response.find(_CITATION_OPEN_TAG)
+    if citation_start != -1:
+        return visible_response[:citation_start]
+
+    for prefix_length in range(len(_CITATION_OPEN_TAG) - 1, 0, -1):
+        if visible_response.endswith(_CITATION_OPEN_TAG[:prefix_length]):
+            return visible_response[:-prefix_length]
+
+    return visible_response
+
+
 def parse_citation_candidates(response: str) -> tuple[str, list[dict[str, object]]]:
     """Split the user-visible answer from the machine-readable citation block."""
     match = _CITATION_BLOCK_RE.search(response)
@@ -179,14 +195,38 @@ def build_grounded_response(
 ) -> tuple[str, list[dict[str, object]]]:
     """Return the visible answer and validated citations for persistence/UI."""
     answer, candidates = parse_citation_candidates(response)
-    documents_by_filename = {document.filename: document for document in documents}
+    documents_by_filename: dict[str, CitationContext] = {}
+    ambiguous_filenames: set[str] = set()
+    for document in documents:
+        if document.filename in documents_by_filename:
+            ambiguous_filenames.add(document.filename)
+            continue
+        documents_by_filename[document.filename] = document
     citations: list[dict[str, object]] = []
 
     for candidate in candidates:
         filename = candidate.get("filename")
         page = candidate.get("page")
 
-        if not isinstance(filename, str) or filename not in documents_by_filename:
+        if not isinstance(filename, str):
+            logger.warning(
+                "Dropped citation candidate: reason=%s filename=%r page=%r",
+                "unknown_filename",
+                filename,
+                page,
+            )
+            continue
+
+        if filename in ambiguous_filenames:
+            logger.warning(
+                "Dropped citation candidate: reason=%s filename=%r page=%r",
+                "ambiguous_filename",
+                filename,
+                page,
+            )
+            continue
+
+        if filename not in documents_by_filename:
             logger.warning(
                 "Dropped citation candidate: reason=%s filename=%r page=%r",
                 "unknown_filename",

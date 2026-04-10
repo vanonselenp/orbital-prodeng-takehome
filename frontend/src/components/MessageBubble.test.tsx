@@ -173,6 +173,19 @@ describe("StreamingBubble", () => {
 		expect(dots.length).toBeGreaterThanOrEqual(3);
 	});
 
+	it("does not render a citations block while streaming", () => {
+		render(
+			<StreamingBubble
+				content={
+					'Visible answer\n<citations>[{"filename":"lease.pdf","page":1}]</citations>'
+				}
+			/>,
+		);
+
+		expect(screen.getByText(/Visible answer/)).toBeInTheDocument();
+		expect(screen.queryByText(/<citations>/)).not.toBeInTheDocument();
+	});
+
 	it("always shows cursor", () => {
 		render(<StreamingBubble content="text" />);
 		const cursor = document.querySelector(".animate-pulse.bg-neutral-400");

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import io
+import sqlite3
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import UploadFile
+from sqlalchemy.exc import IntegrityError
 
 from takehome.db.models import Document
 from takehome.services.conversation import create_conversation
@@ -94,6 +97,45 @@ async def test_upload_document_duplicate_filename_rejected(db_session, tmp_uploa
 
     with pytest.raises(ValueError, match="already exists in this conversation"):
         await upload_document(db_session, conv.id, duplicate)
+
+
+async def test_documents_table_enforces_unique_filename_per_conversation(db_session):
+    conv = await create_conversation(db_session)
+    db_session.add(
+        Document(
+            conversation_id=conv.id,
+            filename="lease.pdf",
+            file_path="/tmp/lease-a.pdf",
+            page_count=1,
+        )
+    )
+    db_session.add(
+        Document(
+            conversation_id=conv.id,
+            filename="lease.pdf",
+            file_path="/tmp/lease-b.pdf",
+            page_count=1,
+        )
+    )
+
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+
+
+async def test_upload_document_translates_integrity_error_to_value_error(
+    db_session, tmp_upload_dir, monkeypatch
+):
+    conv = await create_conversation(db_session)
+    file = make_upload_file(MINIMAL_PDF, filename="lease.pdf")
+
+    monkeypatch.setattr(
+        db_session,
+        "commit",
+        AsyncMock(side_effect=IntegrityError("insert", {}, sqlite3.IntegrityError("duplicate"))),
+    )
+
+    with pytest.raises(ValueError, match="already exists in this conversation"):
+        await upload_document(db_session, conv.id, file)
 
 
 async def test_upload_document_at_limit_raises(db_session, tmp_upload_dir):

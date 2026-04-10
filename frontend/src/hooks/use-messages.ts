@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as api from "../lib/api";
+import { stripPartialCitationBlock } from "../lib/streaming-citations";
 import type { Message } from "../types";
 
 export function useMessages(conversationId: string | null) {
@@ -97,10 +98,10 @@ export function useMessages(conversationId: string | null) {
 
 							if (parsed.type === "delta" && parsed.delta) {
 								accumulated += parsed.delta;
-								setStreamingContent(accumulated);
+								setStreamingContent(stripPartialCitationBlock(accumulated));
 							} else if (parsed.type === "content" && parsed.content) {
 								accumulated += parsed.content;
-								setStreamingContent(accumulated);
+								setStreamingContent(stripPartialCitationBlock(accumulated));
 							} else if (parsed.type === "message" && parsed.message) {
 								// Final message from server
 								setMessages((prev) => [...prev, parsed.message as Message]);
@@ -109,7 +110,7 @@ export function useMessages(conversationId: string | null) {
 							} else if (parsed.content && !parsed.type) {
 								// Fallback: plain content field
 								accumulated += parsed.content;
-								setStreamingContent(accumulated);
+								setStreamingContent(stripPartialCitationBlock(accumulated));
 							}
 							/* v8 ignore stop */
 						} catch {
@@ -124,12 +125,12 @@ export function useMessages(conversationId: string | null) {
 					const assistantMessage: Message = {
 						id: `stream-${Date.now()}`,
 						conversation_id: conversationId,
-					role: "assistant",
-					content: accumulated,
-					sources_cited: 0,
-					citations: [],
-					created_at: new Date().toISOString(),
-				};
+						role: "assistant",
+						content: stripPartialCitationBlock(accumulated),
+						sources_cited: 0,
+						citations: [],
+						created_at: new Date().toISOString(),
+					};
 					setMessages((prev) => [...prev, assistantMessage]);
 				}
 

@@ -7,6 +7,7 @@ from takehome.services.llm import (
     REFUSAL_MESSAGE,
     CitationContext,
     MAX_DOCUMENT_TEXT_LENGTH,
+    strip_partial_citation_block,
     _truncate_documents,
     build_grounded_response,
     chat_with_documents,
@@ -54,6 +55,23 @@ def test_parse_citation_candidates_non_list_block_is_ignored():
     assert citations == []
 
 
+def test_strip_partial_citation_block_hides_complete_block():
+    assert (
+        strip_partial_citation_block(
+            'Answer\n<citations>[{"filename":"lease.pdf","page":1}]</citations>'
+        )
+        == "Answer\n"
+    )
+
+
+def test_strip_partial_citation_block_hides_incomplete_tag_start():
+    assert strip_partial_citation_block("Answer\n<cit") == "Answer\n"
+
+
+def test_strip_partial_citation_block_hides_open_tag_without_close():
+    assert strip_partial_citation_block("Answer\n<citations>") == "Answer\n"
+
+
 def test_build_grounded_response_keeps_valid_citations():
     answer, citations = build_grounded_response(
         (
@@ -77,6 +95,17 @@ def test_build_grounded_response_keeps_valid_citations():
 def test_build_grounded_response_drops_unknown_filename(caplog):
     answer, citations = build_grounded_response(
         'Answer<citations>[{"filename":"missing.pdf","page":1}]</citations>',
+        documents=[CitationContext(document_id="doc-1", filename="lease.pdf", page_count=5)],
+    )
+
+    assert answer == REFUSAL_MESSAGE
+    assert citations == []
+    assert "unknown_filename" in caplog.text
+
+
+def test_build_grounded_response_drops_non_string_filename(caplog):
+    answer, citations = build_grounded_response(
+        'Answer<citations>[{"filename":true,"page":1}]</citations>',
         documents=[CitationContext(document_id="doc-1", filename="lease.pdf", page_count=5)],
     )
 
@@ -112,6 +141,20 @@ def test_build_grounded_response_refuses_when_no_valid_citations():
 
     assert answer == REFUSAL_MESSAGE
     assert citations == []
+
+
+def test_build_grounded_response_drops_ambiguous_filename(caplog):
+    answer, citations = build_grounded_response(
+        'Answer<citations>[{"filename":"lease.pdf","page":1}]</citations>',
+        documents=[
+            CitationContext(document_id="doc-1", filename="lease.pdf", page_count=5),
+            CitationContext(document_id="doc-2", filename="lease.pdf", page_count=5),
+        ],
+    )
+
+    assert answer == REFUSAL_MESSAGE
+    assert citations == []
+    assert "ambiguous_filename" in caplog.text
 
 
 @patch("takehome.services.llm.agent")

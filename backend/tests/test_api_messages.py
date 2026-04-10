@@ -105,9 +105,13 @@ async def test_send_message_first_message_generates_title(
     message_events = [e for e in events if e["type"] == "message"]
     done_events = [e for e in events if e["type"] == "done"]
 
-    assert len(content_events) == 3
+    assert len(content_events) == 2
     assert len(message_events) == 1
     assert len(done_events) == 1
+    assert [event["content"] for event in content_events] == [
+        "Based on lease.pdf page 1, ",
+        "the answer is yes.\n",
+    ]
     assert done_events[0]["sources_cited"] == 0
     assert message_events[0]["message"]["sources_cited"] == 0
     assert message_events[0]["message"]["citations"] == []
@@ -153,7 +157,12 @@ async def test_send_message_persists_and_streams_valid_citations(
     message_events = [e for e in events if e["type"] == "message"]
     done_events = [e for e in events if e["type"] == "done"]
     final_message = message_events[0]["message"]
+    content_events = [e for e in events if e["type"] == "content"]
 
+    assert [event["content"] for event in content_events] == [
+        "Based on lease.pdf page 1, ",
+        "the answer is yes.\n",
+    ]
     assert done_events[0]["sources_cited"] == 1
     assert final_message["sources_cited"] == 1
     assert final_message["content"] == "Based on lease.pdf page 1, the answer is yes."
@@ -271,8 +280,17 @@ async def test_send_message_llm_error_handled(mock_chat, mock_title, db_session,
     events = await _collect_stream(response)
 
     content_events = [e for e in events if e["type"] == "content"]
+    message_events = [e for e in events if e["type"] == "message"]
     assert len(content_events) == 1
     assert "error occurred" in content_events[0]["content"]
+    assert message_events[0]["message"]["content"] == content_events[0]["content"]
+    assert message_events[0]["message"]["citations"] == []
+    assert message_events[0]["message"]["sources_cited"] == 0
+
+    stored_messages = await list_messages(conversation_id=conv.id, session=db_session)
+    assert stored_messages[-1].content == content_events[0]["content"]
+    assert stored_messages[-1].citations == []
+    assert stored_messages[-1].sources_cited == 0
 
 
 @patch("takehome.web.routers.messages.generate_title", new_callable=AsyncMock)

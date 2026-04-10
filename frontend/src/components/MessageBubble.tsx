@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { Bot } from "lucide-react";
 import { Streamdown } from "streamdown";
 import "streamdown/styles.css";
+import { stripPartialCitationBlock } from "../lib/streaming-citations";
 import type { Citation, Message } from "../types";
 
 interface MessageBubbleProps {
@@ -98,15 +99,17 @@ interface StreamingBubbleProps {
 }
 
 export function StreamingBubble({ content }: StreamingBubbleProps) {
+	const visibleContent = stripPartialCitationBlock(content);
+
 	return (
 		<div className="flex gap-3 py-1.5">
 			<div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-neutral-900">
 				<Bot className="h-4 w-4 text-white" />
 			</div>
 			<div className="min-w-0 max-w-[80%]">
-				{content ? (
+				{visibleContent ? (
 					<div className="prose">
-						<Streamdown mode="streaming">{content}</Streamdown>
+						<Streamdown mode="streaming">{visibleContent}</Streamdown>
 					</div>
 				) : (
 					<div className="flex items-center gap-1 py-2">

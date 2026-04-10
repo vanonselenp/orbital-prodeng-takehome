@@ -8,6 +8,7 @@ import fitz  # type: ignore[reportMissingTypeStubs] # PyMuPDF
 import structlog
 from fastapi import UploadFile
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from takehome.config import settings
@@ -112,7 +113,13 @@ async def upload_document(
         page_count=page_count,
     )
     session.add(document)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise ValueError(
+            f"A document named '{original_filename}' already exists in this conversation."
+        ) from exc
     await session.refresh(document)
     return document
 
