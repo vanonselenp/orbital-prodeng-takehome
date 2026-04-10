@@ -1,4 +1,4 @@
-const CITATION_BLOCK_PATTERN = /<citations>\s*(.*?)\s*<\/citations>/s;
+const CITATION_BLOCK_PATTERN = /<citations>\s*(.*?)\s*<\/citations>/gs;
 const CITATION_OPEN_TAG = "<citations>";
 
 export function stripPartialCitationBlock(content: string): string {

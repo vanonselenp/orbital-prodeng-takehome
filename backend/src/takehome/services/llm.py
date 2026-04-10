@@ -152,7 +152,7 @@ async def chat_with_documents(
 
 def strip_partial_citation_block(response: str) -> str:
     """Hide the machine-readable citation block from in-progress streamed text."""
-    visible_response = _CITATION_BLOCK_RE.sub("", response, count=1)
+    visible_response = _CITATION_BLOCK_RE.sub("", response)
 
     citation_start = visible_response.find(_CITATION_OPEN_TAG)
     if citation_start != -1:
@@ -167,11 +167,12 @@ def strip_partial_citation_block(response: str) -> str:
 
 def parse_citation_candidates(response: str) -> tuple[str, list[dict[str, object]]]:
     """Split the user-visible answer from the machine-readable citation block."""
-    match = _CITATION_BLOCK_RE.search(response)
-    if match is None:
-        return response.strip(), []
+    matches = list(_CITATION_BLOCK_RE.finditer(response))
+    visible_response = strip_partial_citation_block(_CITATION_BLOCK_RE.sub("", response)).strip()
+    if not matches:
+        return visible_response, []
 
-    visible_response = _CITATION_BLOCK_RE.sub("", response, count=1).strip()
+    match = matches[-1]
 
     try:
         parsed = cast(object, json.loads(match.group(1)))

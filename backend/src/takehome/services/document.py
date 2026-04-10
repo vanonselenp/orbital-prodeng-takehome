@@ -117,6 +117,10 @@ async def upload_document(
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
+        try:
+            os.remove(file_path)
+        except FileNotFoundError:
+            pass
         raise ValueError(
             f"A document named '{original_filename}' already exists in this conversation."
         ) from exc

@@ -17,4 +17,20 @@ describe("stripPartialCitationBlock", () => {
 	it("removes a partial citations tag suffix", () => {
 		expect(stripPartialCitationBlock("Answer\n<cit")).toBe("Answer\n");
 	});
+
+	it("removes repeated complete citations blocks", () => {
+		expect(
+			stripPartialCitationBlock(
+				'Answer\n<citations>[{"filename":"lease.pdf","page":1}]</citations>More\n<citations>[{"filename":"lease.pdf","page":2}]</citations>',
+			),
+		).toBe("Answer\nMore\n");
+	});
+
+	it("removes trailing partial citations markup after a complete block", () => {
+		expect(
+			stripPartialCitationBlock(
+				'Answer\n<citations>[{"filename":"lease.pdf","page":1}]</citations><citations>{bad json}',
+			),
+		).toBe("Answer\n");
+	});
 });

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import sqlite3
 from unittest.mock import AsyncMock
 
@@ -136,6 +137,24 @@ async def test_upload_document_translates_integrity_error_to_value_error(
 
     with pytest.raises(ValueError, match="already exists in this conversation"):
         await upload_document(db_session, conv.id, file)
+
+
+async def test_upload_document_removes_file_when_commit_hits_duplicate(
+    db_session, tmp_upload_dir, monkeypatch
+):
+    conv = await create_conversation(db_session)
+    file = make_upload_file(MINIMAL_PDF, filename="lease.pdf")
+
+    monkeypatch.setattr(
+        db_session,
+        "commit",
+        AsyncMock(side_effect=IntegrityError("insert", {}, sqlite3.IntegrityError("duplicate"))),
+    )
+
+    with pytest.raises(ValueError, match="already exists in this conversation"):
+        await upload_document(db_session, conv.id, file)
+
+    assert os.listdir(tmp_upload_dir) == []
 
 
 async def test_upload_document_at_limit_raises(db_session, tmp_upload_dir):

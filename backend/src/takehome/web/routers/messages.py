@@ -20,7 +20,6 @@ from takehome.services.llm import (
     build_grounded_response,
     chat_with_documents,
     generate_title,
-    strip_partial_citation_block,
 )
 
 logger = structlog.get_logger()
@@ -143,7 +142,6 @@ async def send_message(
     async def event_stream() -> AsyncIterator[str]:
         """Generate SSE events with the streamed LLM response."""
         full_response = ""
-        visible_response = ""
         stream_failed = False
 
         try:
@@ -153,12 +151,6 @@ async def send_message(
                 conversation_history=conversation_history,
             ):
                 full_response += chunk
-                next_visible_response = strip_partial_citation_block(full_response)
-                next_chunk = next_visible_response[len(visible_response) :]
-                visible_response = next_visible_response
-                if next_chunk:
-                    event_data = json.dumps({"type": "content", "content": next_chunk})
-                    yield f"data: {event_data}\n\n"
 
         except Exception:
             logger.exception(
@@ -170,12 +162,11 @@ async def send_message(
             )
             stream_failed = True
             full_response = error_msg
-            visible_response = error_msg
             event_data = json.dumps({"type": "content", "content": error_msg})
             yield f"data: {event_data}\n\n"
 
         if stream_failed:
-            grounded_response = visible_response
+            grounded_response = full_response
             citations = []
         else:
             grounded_response, citations = build_grounded_response(

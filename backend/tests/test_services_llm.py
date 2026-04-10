@@ -55,6 +55,31 @@ def test_parse_citation_candidates_non_list_block_is_ignored():
     assert citations == []
 
 
+def test_parse_citation_candidates_uses_last_complete_block_and_strips_all_blocks():
+    response = (
+        "Answer"
+        '<citations>[{"filename":"first.pdf","page":1}]</citations>'
+        " still visible?"
+        '<citations>[{"filename":"lease.pdf","page":3}]</citations>'
+    )
+
+    answer, citations = parse_citation_candidates(response)
+
+    assert answer == "Answer still visible?"
+    assert citations == [{"filename": "lease.pdf", "page": 3}]
+
+
+def test_parse_citation_candidates_strips_trailing_partial_block_markup():
+    response = (
+        'Answer<citations>[{"filename":"lease.pdf","page":3}]</citations><citations>{bad json}'
+    )
+
+    answer, citations = parse_citation_candidates(response)
+
+    assert answer == "Answer"
+    assert citations == [{"filename": "lease.pdf", "page": 3}]
+
+
 def test_strip_partial_citation_block_hides_complete_block():
     assert (
         strip_partial_citation_block(
@@ -70,6 +95,29 @@ def test_strip_partial_citation_block_hides_incomplete_tag_start():
 
 def test_strip_partial_citation_block_hides_open_tag_without_close():
     assert strip_partial_citation_block("Answer\n<citations>") == "Answer\n"
+
+
+def test_strip_partial_citation_block_hides_multiple_complete_blocks():
+    assert (
+        strip_partial_citation_block(
+            "Answer\n"
+            '<citations>[{"filename":"lease.pdf","page":1}]</citations>'
+            "More\n"
+            '<citations>[{"filename":"lease.pdf","page":2}]</citations>'
+        )
+        == "Answer\nMore\n"
+    )
+
+
+def test_strip_partial_citation_block_hides_trailing_partial_block_after_complete_one():
+    assert (
+        strip_partial_citation_block(
+            "Answer\n"
+            '<citations>[{"filename":"lease.pdf","page":1}]</citations>'
+            "<citations>{bad json}"
+        )
+        == "Answer\n"
+    )
 
 
 def test_build_grounded_response_keeps_valid_citations():
