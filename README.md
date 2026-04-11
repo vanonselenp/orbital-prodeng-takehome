@@ -67,3 +67,9 @@ We've included sample legal documents in `sample-docs/` for testing.
 - `just db-shell` — Open a psql shell
 - `just shell-backend` — Shell into backend container
 - `just logs-backend` — Tail backend logs
+
+## Loom recording
+
+Loom walkthrough: demonstrates multi-document conversations, verified citations, and the product reasoning behind prioritizing trust for legal due diligence workflows.
+
+https://www.loom.com/share/5a13f8fd506a4ce9a87dd3f49550ca37
